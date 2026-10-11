@@ -1,0 +1,40 @@
+#!/bin/sh
+# Left pane of kakbr: runs broot at kakbr.conf's sidebar width (@kakbr_width:
+# 25% of the window, within 24..40 columns). kakbr.conf's hook sets it as the
+# window resizes; this sets it once kak's pane is beside it, and snaps it
+# into 24..40 when it's resized by hand (dragging the border).
+pane=${TMUX_PANE:?kakbr-sidebar: not inside tmux}
+tmux set-option -w -t "$pane" @kakbr_side "$pane"
+
+last=
+fit() {
+	set -- $(tmux display-message -p -t "$pane" \
+		'#{pane_width} #{window_width} #{window_panes} #{E:@kakbr_width} #{@kakbr_min} #{@kakbr_max}') || return
+	w=$1 now="$2 $3"
+	[ "$3" -ge 2 ] || { last=$now; return; }    # alone: nothing to size against
+	if [ "$now" = "$last" ]; then
+		want=$(( w < $5 ? $5 : w > $6 ? $6 : w ))   # by hand: the window is as it was
+	else
+		want=$4
+	fi
+	last=$now
+	[ "$w" = "$want" ] || tmux resize-pane -t "$pane" -x "$want"
+}
+
+# broot runs as a child (no job control, so it stays in the terminal's
+# foreground process group) and this shell gets every SIGWINCH alongside it.
+# KAKBR_SESSION (from kakbr) tells broot-open it's the sidebar; the opener dir
+# routes double-click there.
+PATH="$HOME/.local/lib/broot-opener:$PATH" broot "$@" </dev/tty >/dev/tty &
+pid=$!
+
+# The trap only flags; fit runs here, so the resize it causes (another
+# SIGWINCH, the width then already right) is handled by the next pass rather
+# than re-entering it.
+resized=1
+trap 'resized=1' WINCH
+while :; do
+	while [ -n "$resized" ]; do resized=; fit >/dev/null 2>&1; done
+	wait "$pid"; status=$?          # returns early when SIGWINCH arrives
+	kill -0 "$pid" 2>/dev/null || exit "$status"
+done

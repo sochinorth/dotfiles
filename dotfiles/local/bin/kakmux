@@ -1,0 +1,14 @@
+#!/bin/sh
+# kakmux [kak args]: Kakoune in its own tmux server (kakmux-PID), whose status
+# line is the bufferline (see "bufferline" in kakrc). It ends with its
+# terminal (or pane), as plain kak does: detached, its server would linger
+# unseen.
+# Inside another tmux it nests, as one pane there with its splits and
+# bufferline inside; at its edges, kak's <c-w> h/j/k/l move on to the panes
+# around it (@outer_pane, see split-focus in kakrc). Inside a kakmux, plain
+# kak.
+case ${TMUX%%,*} in */kakmux-*) exec kak "$@" ;; esac
+
+set -- kak "$@" \; set-option destroy-unattached on
+[ -z "$TMUX" ] || set -- "$@" \; set-option @outer_pane "${TMUX%%,*} $TMUX_PANE"
+TMUX= exec tmux -L "kakmux-$$" -f ~/.config/kak/kakmux.conf new-session -- "$@"

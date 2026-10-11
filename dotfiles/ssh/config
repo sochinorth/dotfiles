@@ -1,0 +1,11 @@
+Host cudy-wr3000s
+	HostName 192.168.0.1
+	User root
+	IdentityFile ~/.ssh/id_ed25519_openwrt
+	IdentitiesOnly yes
+
+Host github.com
+	HostName github.com
+	User git
+	IdentityFile ~/.ssh/id_ed25519_github
+	IdentitiesOnly yes

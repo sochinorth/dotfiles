@@ -1,0 +1,40 @@
+theme = "onedark"
+
+[editor]
+bufferline = "multiple"
+preview-completion-insert = false
+end-of-line-diagnostics = "warning"
+
+[editor.lsp]
+display-progress-messages = true
+snippets = false
+
+[editor.auto-save]
+focus-lost = true
+
+[editor.indent-guides]
+render = true
+
+[editor.soft-wrap]
+enable = true
+
+[editor.inline-diagnostics]
+cursor-line = "warning"
+
+[keys.normal]
+C-right = "move_next_word_start"
+C-left = "move_prev_word_end"
+S-right = "extend_char_right"
+S-left = "extend_char_left"
+
+[keys.insert]
+C-right = "move_next_word_start"
+C-left = "move_prev_word_end"
+S-right = "extend_char_right"
+S-left = "extend_char_left"
+
+[keys.select]
+C-right = "extend_next_word_start"
+C-left = "extend_prev_word_end"
+S-right = "extend_char_right"
+S-left = "extend_char_left"

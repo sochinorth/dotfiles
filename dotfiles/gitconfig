@@ -1,0 +1,14 @@
+[core]
+	pager = delta
+[init]
+	defaultBranch = trunk
+[gpg]
+	format = ssh
+[user]
+	email = 336912582+sochinorth@users.noreply.github.com
+    name = sochi north
+    signingkey = /home/sochinorth/.ssh/id_ed25519_github.pub
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true

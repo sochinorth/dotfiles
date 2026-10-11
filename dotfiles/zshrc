@@ -1,0 +1,184 @@
+ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+ZINIT_URL="https://github.com/zdharma-continuum/zinit"
+
+[[ -d $ZINIT_HOME ]] || git clone "$ZINIT_URL" "$ZINIT_HOME"
+source "$ZINIT_HOME/zinit.zsh"
+
+zinit wait lucid for \
+	atinit"zicompinit; zicdreplay" \
+		zdharma-continuum/fast-syntax-highlighting \
+	atload"_zsh_autosuggest_start" \
+    	zsh-users/zsh-autosuggestions \
+	blockf atpull'zinit creinstall -q .' \
+    	zsh-users/zsh-completions
+
+_zinit_update_check() {
+	local stamp=~/.cache/zinit-update-check out=~/.cache/zinit-updates
+
+	[[ -s $out ]] && print -P "%F{yellow}zinit updates:%f $(<$out) %F{8}(run zup)%f"
+
+	local -a recent=( ${~stamp}(N.mh-24) )
+	(( $#recent )) && return
+
+	{
+		mkdir -p ${stamp:h} && touch $stamp
+		local d; local -a repos outdated
+		for d in ${ZINIT[BIN_DIR]} ${ZINIT[PLUGINS_DIR]}/*(N/); do
+			[[ -d $d/.git ]] && repos+=($d)
+		done
+		for d in $repos; do git -C $d fetch --quiet 2>/dev/null & done
+		wait
+		for d in $repos; do
+			[[ $(git -C $d rev-parse HEAD) != $(git -C $d rev-parse '@{u}' 2>/dev/null) ]] \
+				&& outdated+=(${${d:t}//---//})
+		done
+		if (( $#outdated )); then print -r -- "${(j:, :)outdated}" >| $out; else : >| $out; fi
+	} &!
+}
+_zinit_update_check
+
+zup() { zinit self-update && zinit update --parallel && : >| ~/.cache/zinit-updates }
+
+###############################################################################
+
+export COLORTERM=truecolor
+export EDITOR=kak
+export VISUAL=kak
+export FUDO_HIDE=1
+
+path+=("$HOME/.local/bin")
+# platform-specific bits (e.g. WSL's Windows PATH), deployed by mise.<env>.toml
+for f in ~/.config/zsh/conf.d/*.zsh(N); do source $f; done
+
+export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
+export FZF_CTRL_T_COMMAND=$FZF_DEFAULT_COMMAND
+export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers {}'"
+
+bindkey '^[[H'	beginning-of-line
+bindkey '^[[1~'	beginning-of-line
+bindkey '^[OH'	beginning-of-line
+bindkey '^[[F'	end-of-line
+bindkey '^[[4~'	end-of-line
+bindkey '^[OF'	end-of-line
+bindkey '^[[3~'	delete-char
+
+bindkey '^[[1;5D'	backward-word
+bindkey '^[[1;5C'	forward-word
+bindkey '^H'		backward-kill-word
+bindkey '^[[3;5~'	kill-word
+
+alias ls='eza --group-directories-first'
+alias ll='eza -l --git --group-directories-first'
+
+alias cat='bat -pp'
+alias grep='grep --color=auto'
+alias tree='eza --tree'
+
+lk() {
+	local dir
+	dir=$(walk --fuzzy "$@") && [[ -n $dir ]] && cd -- "$dir"
+}
+
+source ~/.config/broot/launcher/bash/br
+# broot sends double-clicks to the system opener; give it one that opens kak
+broot() { PATH=~/.local/lib/broot-opener:$PATH command broot "$@" }
+
+# kak's :kakmux hands its session to a new kakmux and quits; this picks it up
+# in the same terminal (the handoff file names the kakmux's tmux server).
+kak() {
+	local handoff=${XDG_RUNTIME_DIR:-/tmp}/kakmux-handoff-$$ name
+	rm -f -- $handoff
+	KAKMUX_HANDOFF=$handoff command kak "$@"
+	local rc=$?
+	[[ -s $handoff ]] || return $rc
+	name=$(<$handoff); rm -f -- $handoff
+	TMUX= tmux -L "$name" attach \; set-option destroy-unattached on
+}
+
+# kakbr [file|dir]: broot as a sidebar beside Kakoune, as one pane wherever it
+# runs (a terminal, or nested in another tmux): its own tmux server
+# (kakbr-PID, ~/.config/kakbr/kakbr.conf) holding broot and a kakmux, so
+# kak's splits and bufferline stay in the kak half. Files opened from broot go
+# to kak (broot-open); <c-w> l/h move between the two. It lasts as long as kak:
+# quitting kak (:qa, :q in its last split, or <c-w> q in broot) closes it all.
+#   file        → kak opens it and gets focus; broot opens in $PWD if the
+#                 file is under it, otherwise in the file's own directory
+#   dir/nothing → broot in that dir (default $PWD) with focus, empty kak
+kakbr() {
+	emulate -L zsh
+	local target=${1:-$PWD} root file
+	if [[ -d $target ]]; then
+		root=${target:A}
+	else
+		file=${target:A}
+		[[ -d ${file:h} ]] || { print -u2 "kakbr: no such directory: ${file:h}"; return 1 }
+		if [[ $file == $PWD/* ]]; then root=$PWD; else root=${file:h}; fi
+	fi
+
+	# kakbr's tmux server, and the session of the kak in it
+	local session=kakbr-$$ ids
+	local -a t=(env -u TMUX -u TMUX_PANE tmux -L $session -f ~/.config/kakbr/kakbr.conf)
+	# at this terminal's size (not tmux's default), so broot's width (25%,
+	# within 24..40 columns: kakbr.conf, kakbr-sidebar) is right from the start
+	local -a size=($(stty size 2>/dev/null)) dims
+	(( $#size == 2 )) && dims=(-x $size[2] -y $size[1])
+	ids=("${(@f)$($t new-session -d -s $session -n ${root:t} -c $root $dims \
+		-P -F $'#{session_id}\n#{pane_id}\n#{socket_path}' \
+		-- env KAKBR_SESSION=$session ~/.local/bin/kakbr-sidebar)}") || return
+	$t set-option -p -t $ids[2] @kakbr_sidebar 1
+	# nested in another tmux: at the edges, <c-w> moves on there
+	[[ -n $TMUX ]] && $t set-option -t $ids[1] @outer_pane "${TMUX%%,*} $TMUX_PANE"
+	# kak: a kakmux beside broot; when it ends, so does kakbr
+	local q=\' kak
+	local -a args=(-s $session)
+	# opened with :edit (not as an argument) to show it relative to the cwd
+	[[ -n $file ]] && args+=(-e "edit -- $q${file//$q/$q$q}$q")
+	kak=$($t split-window -h -t $ids[2] -c $root -P -F '#{pane_id}' -- \
+		sh -c '"$@"; tmux kill-session -t "$TMUX_PANE"' sh ~/.local/bin/kakmux $args) || return
+	# for broot-open and <c-w> q, to focus kak
+	$t set-option -w -t $ids[2] @kakbr_kak $kak
+	[[ -n $file ]] || $t select-pane -t $ids[2]
+
+	# Closing the terminal would otherwise detach, leaving broot and kak
+	# running in the background. (An explicit detach ends it too.) Set once
+	# attached: on an unattached session it ends it there and then.
+	$t attach -t $ids[1] \; set-option -t $ids[1] destroy-unattached on
+}
+
+doasedit() {
+	emulate -L zsh
+	(( $# )) || { print -u2 "usage: doasedit FILE..."; return 2 }
+	local f tmp orig rc=0
+	for f in "$@"; do
+		tmp=$(mktemp --tmpdir --suffix=".${f:t}" doasedit.XXXXXX) || return 1
+		orig=$tmp.orig
+		{
+			if [[ -r $f ]]; then
+				cat -- $f > $tmp
+			elif [[ -e $f ]]; then
+				doas cat -- $f > $tmp || { rc=1; continue }
+			fi
+			cp -- $tmp $orig
+			${=VISUAL:-${EDITOR:-vi}} $tmp || { rc=1; continue }
+			[[ $(cksum < $tmp) == $(cksum < $orig) ]] || doas tee -- $f < $tmp > /dev/null || rc=1
+		} always {
+			rm -f -- $tmp $orig
+		}
+	done
+	return rc
+}
+alias sudoedit='doasedit'
+
+setopt auto_pushd pushd_ignore_dups pushd_silent
+setopt complete_in_word always_to_end
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
+zstyle ':completion:*' group-name ''
+
+if [[ -o interactive ]] && command -v fortune >/dev/null; then
+	fortune
+fi
+
+eval "$(starship init zsh)"
+

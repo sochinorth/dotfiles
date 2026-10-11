@@ -1,0 +1,165 @@
+#!/bin/sh
+# kakmux-even SOCKET TARGET split PANE | close | all | weight [h|v|-] [W]
+#
+# Weighted, Helix-style even splits for kakmux's tmux window TARGET (a window
+# or a pane in it): opening or closing a split shares out the row/column it
+# touched by weight, and nothing else. A member that is itself split is
+# scaled as a whole, keeping its own proportions (hand-resized ones too).
+#
+# Every member of a row/column has a weight there, 1 unless set. A member is
+# known by the panes it holds: "%3" for a pane, "%1,%3" for a split member
+# holding those two. Splits and closes rename the members they change.
+#
+#   split PANE  PANE was just split off from a pane P. Along P's row/column,
+#               PANE gets P's weight there, so plain splits stay even (a
+#               second :vs makes thirds); across it, P and PANE form a new
+#               pair that takes P's place and weight. If kakrc set the window
+#               option @kakmux_ratio to R for this split, P is R% and PANE
+#               (100 - R)% of the two of them. Then the row/column PANE is
+#               in is shared out again.
+#   close       one pane went away: the row/column it was in is shared out
+#               again. With one member left, tmux dissolves the row/column,
+#               and that member takes over its place and weight.
+#   all         share out everything by weight, nested rows/columns too.
+#   weight      with W, set TARGET pane's weight in the row/column it's
+#               directly in, or with h (v), that of the member holding it in
+#               the next row (column) out, then share that row/column out
+#               again. Without, print those three weights ("own h v", - for
+#               none).
+#
+# Weights live in the window option @kakmux_weights ({members: weight}).
+# For a close, where the pane was comes from @kakmux_cur/@kakmux_prev, which
+# kakmux.conf keeps as the window's last two layouts. The new layout is
+# computed whole and applied in one select-layout, so everything outside the
+# touched row/column keeps its exact geometry (resize-pane can't do that:
+# resizing a child of a row through a pane inside it moves the nearest row
+# around that pane instead).
+#
+# Layouts come from #{window_layout} as JSON (tmux >= 3.8): cells are
+# {"t": "h"|"v"|"p", "w", "h", "x", "y", "c": [children], "I": pane id};
+# select-layout takes tmux's classic layout string, built from that.
+
+socket=${1:?} target=${2:?} mode=${3:?}
+t() { tmux -S "$socket" "$@"; }
+
+layout=$(t display-message -p -t "$target" '#{window_layout}' 2>/dev/null) || exit 0
+weights=$(t show-options -wqv -t "$target" @kakmux_weights)
+
+lib='
+	def panes: [.. | objects | select(.t? == "p") | .I];
+	def name: panes | sort | join(",");
+	def weight($ws): $ws[name] // 1;
+	def is_container: .t == "h" or .t == "v";
+	# for a row ("h") / column ("v"): the size its children line up along
+	def size_key: if .t == "h" then "w" else "h" end;
+	def parent_of($id): first(.. | objects | select(is_container and any(.c[]; .I? == $id)));
+	# path to the row/column (of kind $a, or any: "") nearest to pane $p
+	def nearest_path($p; $a):
+		last(path(.. | objects | select(is_container and ($a == "" or .t == $a)) | select(panes | index($p))));
+	# $total cells shared in proportion to $ws, leftovers to the largest remainders
+	def shares($total; $ws):
+		($ws | add) as $sum | [$ws[] | . * $total / $sum] as $exact | [$exact[] | floor] as $f |
+		([range($ws | length) | {i: ., r: ($exact[.] - $f[.])}] | sort_by(-.r) | .[:$total - ($f | add)] | map(.i)) as $plus |
+		[range($ws | length) as $i | $f[$i] + (if any($plus[]; . == $i) then 1 else 0 end)];
+	# resize to $w x $h at $x,$y, laying the children out one after another
+	# with $sizes along the row/column, or (null) in the same proportions as
+	# before, each child scaled to its new size in turn
+	def fit($w; $h; $x; $y; $sizes):
+		.w = $w | .h = $h | .x = $x | .y = $y |
+		if .t == "p" then . else
+			size_key as $s | (.c | length) as $n | (.[$s] - ($n - 1)) as $new |
+			($sizes // shares($new; [.c[] | .[$s]])) as $size |
+			(.t == "h") as $row |
+			reduce range($n) as $i ({cell: ., at: (if $row then $x else $y end)};
+				.at as $at |
+				.cell.c[$i] |= (if $row then fit($size[$i]; $h; $at; $y; null) else fit($w; $size[$i]; $x; $at; null) end) |
+				.at += $size[$i] + 1
+			) | .cell
+		end;
+	# share out this row/column by the weights $ws
+	def share_out($ws): (.c | length) as $n | fit(.w; .h; .x; .y; shares(.[size_key] - ($n - 1); [.c[] | weight($ws)]));
+	def share_out_all($ws): if .t == "p" then . else share_out($ws) | .c |= map(share_out_all($ws)) end;
+	def share_out_at($ws; $path): if $path then setpath($path; getpath($path) | share_out($ws)) else . end;
+	# weights with every member renamed by f (on its list of panes)
+	def rename(f): with_entries(.key |= (split(",") | f | sort | join(","))) | with_entries(select(.key != ""));
+	def lay:
+		"\(.w)x\(.h),\(.x),\(.y)" +
+		(if .t == "p" then ",\(.I | ltrimstr("%"))"
+		elif .t == "h" then "{\(.c | map(lay) | join(","))}"
+		else "[\(.c | map(lay) | join(","))]" end);
+	def csum: reduce explode[] as $ch (0; ((. / 2 | floor) + (. % 2) * 32768 + $ch) % 65536);
+	def hex4: . as $v | [range(3; -1; -1) | ($v / pow(16; .) | floor) % 16 | "0123456789abcdef"[.:.+1]] | join("");
+	# output: the layout string, then the weights to keep
+	def emit($ws): (.L | lay) as $l | "\($l | csum | hex4),\($l)", ($ws | tojson);
+'
+jqrun() { printf %s "$layout" | jq -r --argjson weights "${weights:-"{}"}" "$@"; }
+
+case $mode in
+split)
+	ratio=$(t show-options -wqv -t "$target" @kakmux_ratio)
+	t set-option -wu -t "$target" @kakmux_ratio
+	jqrun --arg n "${4:?}" --arg r "$ratio" "$lib"'
+		(.L | parent_of($n)) as $c | select($c) |
+		($c.c | map(.I) | index($n)) as $ni | $c.c[if $ni > 0 then $ni - 1 else 1 end] as $pc |
+		select($pc.t == "p") | $pc.I as $p |
+		(if $r == "" then [1, 1] else ($r | tonumber) as $r | [$r, 100 - $r] end) as $ratio |
+		($weights[$p] // 1) as $pw |
+		# members holding P now hold the new pane too
+		($weights | rename(if index($p) and length > 1 then . + [$n] else . end)) as $ws |
+		(if ($c | name) == ([$p, $n] | sort | join(",")) then
+			# a new pair across P'"'"'s row/column, in its place
+			$ws + {($c | name): $pw, ($p): $ratio[0], ($n): $ratio[1]}
+		else
+			$ws + {($n): ($pw * $ratio[1] / $ratio[0])}
+		end) as $ws |
+		.L |= share_out_at($ws; nearest_path($n; "")) | emit($ws)' ;;
+close)
+	cur=$(t show-options -wqv -t "$target" @kakmux_cur)
+	prev=$(t show-options -wqv -t "$target" @kakmux_prev)
+	jqrun --arg cur "$cur" --arg prev "$prev" "$lib"'
+		. as $now |
+		# the latest saved layout that still has the pane that went away
+		first(($cur, $prev) | select(. != "") | fromjson | select((panes - ($now | panes)) | length == 1)) as $old |
+		(($old | panes) - panes)[0] as $d |
+		($old.L | parent_of($d)) as $oc |
+		($weights | rename(. - [$d])) as $ws |
+		if ($oc.c | length) == 2 then
+			# dissolved: the member left takes over its place and weight
+			($oc.c[] | select(.I? != $d) | name) as $left |
+			emit($ws + {($left): ($oc | weight($weights))})
+		else
+			(($oc | name | split(",")) - [$d] | join(",")) as $rest |
+			.L |= share_out_at($ws; first(path(.. | objects | select(is_container and name == $rest)))) | emit($ws)
+		end' ;;
+all)
+	jqrun "$lib"'.L |= share_out_all($weights) | emit($weights)' ;;
+weight)
+	pane=$(t display-message -p -t "$target" '#{pane_id}')
+	jqrun --arg p "$pane" --arg axis "${4:-}" --arg w "${5:-}" "$lib"'
+		def shown: (. * 100 | round) / 100;
+		def member_at($cp): {path: $cp, cell: (getpath($cp).c[] | select(panes | index($p)))};
+		# $p in the row/column it is directly in
+		def own: nearest_path($p; "") as $cp | select($cp) | member_at($cp);
+		# the member holding $p in the nearest row/column of kind $a beyond that one
+		def outer($a):
+			nearest_path($p; "") as $own |
+			last(path(.. | objects | select(is_container and .t == $a) | select(panes | index($p))) | select(. != $own)) as $cp |
+			member_at($cp);
+		def which: if $axis == "h" or $axis == "v" then outer($axis) else own end;
+		if $w == "" then
+			[(.L | [own], [outer("h")], [outer("v")]) | (.[0].cell | select(.) | weight($weights) | shown) // "-" | tostring] | join(" ")
+		else
+			(.L | [which][0]) as $m |
+			if $m == null then emit($weights) else
+				($weights + {($m.cell | name): ($w | tonumber)}) as $ws |
+				.L |= share_out_at($ws; $m.path) | emit($ws)
+			end
+		end' ;;
+*)
+	echo "kakmux-even: unknown mode: $mode" >&2; exit 1 ;;
+esac | {
+	read -r new || exit 0
+	read -r keep || { echo "$new"; exit 0; }   # a weight read just prints
+	t select-layout -t "$target" "$new"
+	t set-option -w -t "$target" @kakmux_weights "$keep"
+}

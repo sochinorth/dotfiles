@@ -1,0 +1,70 @@
+######################################################
+####                                              ####
+####        CachyOS Repository Mirrorlist         ####
+####                                              ####
+######################################################
+## CDN77 (World Wide Datacenters)
+Server = https://cdn77.cachyos.org/repo/$arch_v3/$repo
+## Rerouted to mirror
+# Server = https://cdn.cachyos.org/repo/$arch_v3/$repo
+## Germany, disabled due Netcup issues:
+## : OpenSSL SSL_read: SSL_ERROR_SYSCALL, errno 0"
+# Server = https://mirror.cachyos.org/repo/$arch_v3/$repo
+## USA Mirror much thanks to corpdecker!
+Server = https://us.cachyos.org/repo/$arch_v3/$repo
+## India Mirror much thanks to https://github.com/albonycal
+## Disabled due issues at installation
+## Server = https://mirror.albony.xyz/cachylinux/repo/$arch_v3/$repo
+## France Mirror much thanks to Antoine Viallon (aviallon)
+Server = https://mirror.lesviallon.fr/cachy/repo/$arch_v3/$repo
+## Russia Mirror # Removed till sync issue is resolved
+# Server = https://mirror.truenetwork.ru/cachy/repo/$arch_v3/$repo
+## Norway Mirror much thanks to QuadFeed
+# Server = https://mirror.fast0ne.com/repo/$arch_v3/$repo
+## Norway,Netherlands,Canada Mirror much thanks to innoix
+Server = https://no.mirror.cx/cachyos/repo/$arch_v3/$repo
+Server = https://nl.mirror.cx/cachyos/repo/$arch_v3/$repo
+Server = https://ca.mirror.cx/cachyos/repo/$arch_v3/$repo
+## Sweden Mirror much thanks to Zyner!
+Server = https://mirror.zyner.org/mirror/cachyos/repo/$arch_v3/$repo
+## South Korea much thanks to Mihate Hiura!
+# Server = https://mirror.funami.tech/cachy/repo/$arch_v3/$repo
+## Austria Mirror much thanks to Soulharsh!
+Server = https://at.cachyos.org/repo/$arch_v3/$repo
+## Germany Mirror much thanks to Soulharsh!
+## Server = https://de-nue.soulharsh007.dev/cachyos/repo/$arch_v3/$repo
+## Germany Mirror much thanks to MergedEyes!
+Server = https://mirror.mergedcloud.de/cachyos/repo/$arch_v3/$repo
+## USA Mirror much thanks to Soulharsh!
+Server = https://us-mnz.soulharsh007.dev/cachyos/repo/$arch_v3/$repo
+## USA Mirror & CDN mirror provided by Lansing 2600 in Lansing, MI, USA
+Server = https://mirrors.lansing2600.org/cachyos/repo/$arch_v3/$repo
+Server = https://cdn.lansing2600.org/cachyos/repo/$arch_v3/$repo
+## China Mirror 10GBs much thanks to eScience Center, Nanjing University!
+Server = https://mirror.nju.edu.cn/cachyos/repo/$arch_v3/$repo
+## China Mirror much thanks to University of Science and Technology of China!
+Server = https://mirrors.ustc.edu.cn/cachyos/repo/$arch_v3/$repo
+## Hong Kong Mirror much thanks to Saren!
+# Server = https://cachy-mirror.wtako.net/repo/$arch_v3/$repo
+## Quebec, Canada Mirror from All Things Linux
+Server = https://mirror.allthingslinux.org/cachyos/repo/$arch_v3/$repo
+## Italy Mirror much thanks to NextWorks!
+Server = https://cachyos.next-works.it/repo/$arch_v3/$repo
+## Italy Mirror much thanks to ironashram!
+Server = https://cachyos-mirror.m1k.cloud/repo/$arch_v3/$repo
+## Bangladesh 10 GBs much thanks to Limda!
+Server = https://mirror.limda.net/cachy/repo/$arch_v3/$repo
+## Finland Mirror much thanks to doridian!
+Server = https://cachyos.doridian.net/repo/$arch_v3/$repo
+## Switzerland Mirror much thanks to Fabian!
+Server = https://mirror.hb9hil.org/cachyos/repo/$arch_v3/$repo
+## Russia Mirror from Yandex
+# Server = https://mirror.yandex.ru/cachyos/repo/$arch_v3/$repo
+## Russia Mirror much thanks to quinowell and haku.host
+Server = https://archlinux.gay/cachy/repo/$arch_v3/$repo
+## Russia Mirror much thanks to jura12
+Server = https://mirror.jura12.ru/repo/$arch_v3/$repo
+## Russia Mirror much thanks to cachy-arch.ru
+Server = https://mirror.cachy-arch.ru/cachyos/repo/$arch_v3/$repo
+## Russia Mirror much thanks to wan666 from metrosg.ru
+Server = https://wan.metrosg.ru/cachyos/repo/$arch_v3/$repo

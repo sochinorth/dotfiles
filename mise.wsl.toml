@@ -1,0 +1,31 @@
+# WSL module, layered on top of mise.toml:
+#   mise -E wsl bootstrap
+# (.miserc.local.toml can select it by default on a WSL machine.)
+# Sources live in wsl/. Remove everything this module manages with
+#   mise bootstrap unapply wsl
+
+# The xclip shim is only half of the clipboard: win32yank.exe lives on the Windows side.
+[bootstrap.hooks]
+final = """
+test -x /mnt/c/Users/NAME/.local/bin/win32yank.exe \
+  || echo 'warning: win32yank.exe missing from C:\\Users\\NAME\\.local\\bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)'
+"""
+
+# systemd on, default user, hostname, Windows PATH off (wsl/zsh/wsl.zsh adds back only what it needs)
+[bootstrap.files."/etc/wsl.conf"]
+source = "wsl/etc/wsl.conf"
+owner = "root"
+group = "root"
+mode = "0644"
+
+# xclip shim -> win32yank.exe, so tools that only know xclip reach the Windows clipboard
+[bootstrap.files."/usr/local/bin/xclip"]
+source = "wsl/usr/local/bin/xclip"
+owner = "root"
+group = "root"
+mode = "0755"
+
+[dotfiles]
+"~/.config/zsh/conf.d/wsl.zsh" = { source = "wsl/zsh/wsl.zsh", mode = "symlink" }
+# Windows side, so a copy: Windows can't follow a symlink into the WSL filesystem
+"/mnt/c/Users/NAME/.wslconfig" = { source = "wsl/wslconfig", mode = "copy" }

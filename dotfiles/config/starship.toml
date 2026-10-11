@@ -1,0 +1,8 @@
+right_format="$os"
+
+[os]
+disabled = false
+style = "bold bright-cyan"
+
+[os.symbols]
+Arch = "Arch \uf303"

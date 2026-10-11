@@ -1,0 +1,53 @@
+#!/bin/sh
+# Opens a file from broot in Kakoune. Two ways in:
+#   Enter        verbs.hjson runs this with broot's terminal
+#   double-click broot hard-wires this to the system opener; this script is also
+#                installed as wslview/xdg-open in a dir only broot has on PATH
+#                (see broot() in .zshrc and kakbr-sidebar), with no terminal
+#
+# kakbr's sidebar (KAKBR_SESSION, its kak session, set): the kak client focused
+# last gets the file, and kak the focus.
+# Elsewhere in tmux, a kak client in broot's tmux window gets it: the pane
+# focused last if it's one, else the first. Without one, double-click opens
+# kak in a new split to the right, and Enter in broot's own terminal.
+# kakrc labels each kak client's tmux pane with @kak_session/@kak_client.
+file=$1
+
+kq() { printf "'%s'" "$(printf %s "$1" | sed "s/'/''/g")"; }   # kak-quote
+
+# open_in PANE TMUX...: open the file in the kak client in PANE of the tmux
+# run as TMUX..., failing when there's none (a label left by a client that's
+# gone fails too)
+open_in() {
+	pane=$1; shift
+	set -- $("$@" display-message -p -t "$pane" '#{pane_current_command} #{@kak_session} #{@kak_client}' 2>/dev/null)
+	[ $# = 3 ] && [ "$1" = kak ] || return 1
+	printf 'evaluate-commands -client %s %s\n' "$(kq "$3")" "$(kq "edit -- $(kq "$file")")" |
+		kak -p "$2" 2>/dev/null
+}
+
+if [ -n "$KAKBR_SESSION" ]; then
+	printf 'run-in-focused-client %s\n' "$(kq "edit -- $(kq "$file")")" |
+		kak -p "$KAKBR_SESSION" || exit
+	exec tmux select-pane -t "$(tmux show-options -wqv @kakbr_kak)"
+fi
+
+if [ -n "$TMUX" ]; then
+	last=$(tmux display-message -p -t '{last}' '#{pane_id}' 2>/dev/null)
+	for pane in $last $(tmux list-panes -F '#{pane_id}'); do
+		[ "$pane" != "$TMUX_PANE" ] || continue
+		open_in "$pane" tmux || continue
+		exec tmux select-pane -t "$pane"
+	done
+	if ! [ -t 0 ]; then
+		exec tmux split-window -h -l 70% -t "$TMUX_PANE" -c "$PWD" -- \
+			kak -e "edit -- $(kq "$file")"
+	fi
+fi
+
+if [ -t 0 ]; then
+	exec kak -- "$file"             # Enter: broot has handed over the terminal
+else
+	echo "double-click opens kak only inside tmux; press Enter instead" >&2
+	exit 1
+fi

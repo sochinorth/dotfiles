@@ -1,0 +1,334 @@
+#!/bin/sh
+# kak-picker KIND DIR SESSION CLIENT PANE: Helix-style fuzzy picker in a tmux
+# popup, for CLIENT of kak SESSION (whose tmux pane is PANE). kakrc's
+# picker-open fills DIR with the colour scheme's faces (DIR/faces, from
+# :debug faces) and, for KIND=buffers, the buffers themselves (N.name,
+# N.meta = cursor line + modified, N = contents). DIR is removed on exit.
+#
+#   KIND=buffers            the open buffers, most recent first
+#   KIND=files              files under the popup's cwd (kak's), via fd
+#   KIND=locations          a list of `path:line:column:text` lines: DIR/list,
+#                           paths from DIR/root, DIR/type = kak-lsp's kind of
+#                           list (lsp-goto, lsp-diagnostics, ...), DIR/title,
+#                           DIR/only = just this file's (all from kakrc)
+#   KIND=grep               ripgrep under the cwd, as you type
+#   KIND=workspace-symbols  the language server's symbols, as you type
+#   KIND=changed            files changed since HEAD (git status)
+#
+#   enter          open it
+#   ctrl-s/ctrl-v  open it in a new kak client in a split below / to the right
+#   alt-v          same as ctrl-v, for terminals that keep ctrl-v for pasting
+#   ctrl-d         buffers: close it (refused when it has unsaved changes)
+#   alt-d          buffers: close it, discarding unsaved changes
+#
+# fzf calls back into this script as `kak-picker --legend|--list|--delete|
+# --grep|--wsym|--diff ...`.
+#
+# Everything up to fzf runs in the shell itself, no other processes (each one
+# costs a millisecond or two), so the popup comes up at once.
+
+case $0 in /*) self=$0 ;; *) self=$PWD/$0 ;; esac
+tab=$(printf '\t')
+
+kq() { printf "'%s'" "$(printf %s "$1" | sed "s/'/''/g")"; }   # kak-quote
+send() { printf '%s\n' "$1" | kak -p "$session"; }
+
+# the buffers, in order of N (gaps where ctrl-d closed one)
+list_buffers() {
+	max=-1
+	for f in "${dir:?}"/*.name; do
+		[ -e "$f" ] || continue
+		f=${f##*/}; f=${f%.name}
+		[ "$f" -gt "$max" ] && max=$f
+	done
+	f=0
+	while [ "$f" -le "$max" ]; do
+		if [ -e "$dir/$f.name" ]; then
+			# (the files have no final newline: read says so, but reads them)
+			IFS= read -r name < "$dir/$f.name"
+			read -r line modified < "$dir/$f.meta"
+			mark=; [ "$modified" = true ] && mark=' [+]'
+			printf '%s\t%s%s\t%s\t%s\n' "$f" "$name" "$mark" "$line" "$name"
+		fi
+		f=$((f + 1))
+	done
+}
+
+# format_locations ROOT TYPE ONLY: `path:line:column:text` lines (stdin) to
+# fzf items, `absolute path<TAB>line<TAB>column<TAB>shown`. TYPE is kak-lsp's
+# kind of list: diagnostics show their severity, document symbols ("%" for
+# the file named on the first line) their name first. ONLY keeps one file.
+# Colours come from the PICKER_* SGR sequences (set below, exported).
+format_locations() {
+	awk -v root="$1" -v type="$2" -v only="$3" -v dim="$PICKER_DIM" -v fg="$PICKER_FG" \
+		-v err="$PICKER_ERROR" -v warn="$PICKER_WARNING" -v info="$PICKER_INFO" -v hint="$PICKER_HINT" '
+	type == "lsp-document-symbol" && NR == 1 { file = $0; next }
+	match($0, /^[^:]+:[0-9]+:[0-9]+:/) {
+		head = substr($0, 1, RLENGTH - 1); text = substr($0, RLENGTH + 1)
+		path = head; sub(/:[0-9]+:[0-9]+$/, "", path)
+		split(substr(head, length(path) + 2), lc, ":")
+		if (path == "%") path = file
+		abs = path ~ /^\// ? path : root "/" path
+		if (only != "" && abs != only) next
+		gsub(/\t/, "    ", text); sub(/^[ ]+/, "", text); sub(/[ \r]+$/, "", text)
+		loc = dim path ":" lc[1] fg
+		if (type == "lsp-diagnostics") {
+			# [severity][server][source][code] message; related locations
+			# (lines without a severity) left out
+			if (text !~ /^\[(error|warning|info|hint)\]/) next
+			sev = substr(text, 2); sub(/\].*/, "", sev)
+			while (text ~ /^\[[^] ]*\]/) sub(/^\[[^] ]*\]/, "", text)
+			sub(/^ +/, "", text)
+			c = sev == "error" ? err : sev == "warning" ? warn : sev == "info" ? info : hint
+			shown = c sprintf("%-7s", sev) fg " " text "  " loc
+		} else if (type == "lsp-document-symbol") shown = text "  " loc
+		else shown = loc "  " text
+		print abs "\t" lc[1] "\t" lc[2] "\t" shown
+	}'
+}
+
+case $1 in
+--grep)     # QUERY: ripgrep's matches under the cwd
+	[ -n "$2" ] || exit 0
+	rg --column --line-number --no-heading --color never --smart-case -e "$2" 2>/dev/null |
+		head -n 10000 | format_locations "$PWD" grep ''
+	exit ;;
+--wsym)     # DIR SESSION CLIENT QUERY: the server's symbols matching QUERY
+	dir=$2 session=$3 client=$4
+	[ -n "$5" ] || exit 0
+	out=$dir/wsym.$$
+	rm -f -- "$out" "$out.root"
+	send "evaluate-commands -client $client $(kq "set-option window picker_wsym_out $(kq "$out"); lsp-workspace-symbol $(kq "$5")")"
+	# the answer comes back through kakrc's picker-wsym-deliver
+	i=0
+	while [ ! -e "$out" ] && [ "$i" -lt 60 ]; do sleep 0.05; i=$((i + 1)); done
+	[ -e "$out" ] || exit 0
+	IFS= read -r root < "$out.root"
+	format_locations "$root" lsp-workspace-symbol '' < "$out"
+	rm -f -- "$out" "$out.root"
+	exit ;;
+--diff)     # FILE: its changes since HEAD (or all of it, if untracked)
+	if git ls-files --error-unmatch -- "$2" >/dev/null 2>&1; then
+		if command -v delta >/dev/null; then
+			git diff HEAD -- "$2" | delta --paging never --width "${FZF_PREVIEW_COLUMNS:-80}"
+		else
+			git -c color.ui=always diff HEAD -- "$2"
+		fi
+	else
+		bat --color=always --style=numbers -- "$2"
+	fi
+	exit ;;
+--legend)   # ROWS: draw $PICKER_LEGEND on the popup's last row
+	printf '\0337\033[%d;1H%s\033[K\033[0m\0338' "$2" "$PICKER_LEGEND" >/dev/tty
+	exit ;;
+--list)     # DIR
+	dir=$2; list_buffers; exit ;;
+--delete)   # DIR SESSION CLIENT N FORCE; prints fzf actions
+	dir=$2 session=$3 client=$4 n=$5 force=$6
+	[ -e "${dir:?}/${n:?}.name" ] || exit 0
+	IFS= read -r name < "$dir/$n.name"
+	read -r line modified < "$dir/$n.meta"
+	if [ "$modified" = true ] && [ -z "$force" ]; then
+		echo "change-border-label: buffers · $name has unsaved changes, alt-d discards them "
+		exit
+	fi
+	send "delete-buffer${force:+!} $(kq "$name")
+evaluate-commands -client $client bufferline-refresh"
+	rm -f -- "${dir:?}/${n:?}" "${dir:?}/${n:?}.name" "${dir:?}/${n:?}.meta"
+	echo "change-border-label( buffers )+reload:'$self' --list '${dir:?}'"
+	exit ;;
+esac
+
+kind=$1 dir=$2 session=$3 client=$4 pane=$5
+trap 'rm -rf -- "${dir:?}"' EXIT
+trap 'exit 1' HUP INT TERM
+
+# --- colours, from the colour scheme's faces --------------------------------
+# A face line reads ` * Name: fg,bg,underline[+attrs]`; the last one for a
+# face counts. Colours left at "default" fall back down the chain:
+# MenuBackground -> Default -> terminal. These helpers set $v.
+
+while IFS= read -r l; do
+	case $l in
+	' * Default: '*|' * MenuBackground: '*|' * MenuForeground: '*|' * LineNumbers: '*|\
+	' * InlayDiagnostic'*|' * GitGutter'*)
+		n=${l#' * '}; eval "face_${n%%: *}=\${n#*: }" ;;
+	esac
+done < "${dir:?}/faces"
+# fg FACE FALLBACK, bg FACE FALLBACK
+fg() { eval "v=\${face_$1:-}"; v=${v%%,*}; [ -n "$v" ] && [ "$v" != default ] || v=$2; }
+bg() { eval "v=\${face_$1:-}"; v=${v#*,}; v=${v%%,*}; [ -n "$v" ] && [ "$v" != default ] || v=$2; }
+# kak colour -> fzf colour (#rrggbb, an ANSI name, or -1 for default)
+c() { case $1 in rgb:*) v="#${1#rgb:}" ;; rgba:*) v=${1#rgba:}; v="#${v%??}" ;; default) v=-1 ;; *) v=$1 ;; esac; }
+# kak colour -> SGR parameter; $2 is 3 for foreground, 4 for background
+sgr() {
+	case $1 in
+	rgb:*|rgba:*)
+		h=${1#*:} r=${h%????} g=${h#??}; g=${g%??} b=${h#????}; b=${b%"${b#??}"}
+		v="${2}8;2;$((0x$r));$((0x$g));$((0x$b))" ;;
+	bright-*) ansi "${1#bright-}"; v=$(( ($2 == 3 ? 90 : 100) + v )) ;;
+	*) ansi "$1"; v=$2$v ;;
+	esac
+}
+ansi() {
+	case $1 in black) v=0 ;; red) v=1 ;; green) v=2 ;; yellow) v=3 ;;
+	blue) v=4 ;; magenta) v=5 ;; cyan) v=6 ;; white) v=7 ;; *) v=9 ;; esac
+}
+
+fg Default default; dfg=$v; bg Default default; dbg=$v
+fg MenuBackground "$dfg"; mfg=$v; bg MenuBackground "$dbg"; mbg=$v   # list, preview, frame
+fg MenuForeground "$mbg"; sfg=$v; bg MenuForeground "$mfg"; sbg=$v   # selected row
+accent=$sbg                                                         # matches, prompt, keys
+fg LineNumbers "$mfg"; dim=$v                                       # counts, separators
+# as fzf colours
+c "$mfg"; cmfg=$v; c "$mbg"; cmbg=$v; c "$sfg"; csfg=$v; c "$sbg"; csbg=$v
+c "$accent"; caccent=$v; c "$dim"; cdim=$v
+
+# SGR sequences for the lists (format_locations, and the callbacks fzf runs)
+esc=$(printf '\033')
+sgr "$dim" 3; PICKER_DIM="$esc[${v}m"; sgr "$mfg" 3; PICKER_FG="$esc[${v}m"
+fg InlayDiagnosticError red; sgr "$v" 3; PICKER_ERROR="$esc[${v}m"
+fg InlayDiagnosticWarning yellow; sgr "$v" 3; PICKER_WARNING="$esc[${v}m"
+fg InlayDiagnosticInfo blue; sgr "$v" 3; PICKER_INFO="$esc[${v}m"
+fg InlayDiagnosticHint green; sgr "$v" 3; PICKER_HINT="$esc[${v}m"
+fg GitGutterAdd green; sgr "$v" 3; git_add="$esc[${v}m"
+fg GitGutterModify yellow; sgr "$v" 3; git_mod="$esc[${v}m"
+fg GitGutterDelete red; sgr "$v" 3; git_del="$esc[${v}m"
+export PICKER_DIM PICKER_FG PICKER_ERROR PICKER_WARNING PICKER_INFO PICKER_HINT
+
+# --- per-kind setup -----------------------------------------------------------
+
+case $kind in
+buffers)
+	title=buffers
+	legend='enter:open ctrl-s:split-below ctrl-v/alt-v:split-right ctrl-d:close alt-d:discard+close'
+	count=0
+	for f in "${dir:?}"/*.name; do [ -e "$f" ] && count=$((count + 1)); done
+	# start on the previous buffer, so <space>b <ret> flips between two
+	start=1; [ "$count" -gt 1 ] && start=2
+	set -- \
+		--delimiter '\t' --with-nth 2 --accept-nth 1 --no-sort \
+		--bind "load:pos($start)+unbind(load)" \
+		--bind "ctrl-d:transform:'$self' --delete '${dir:?}' '$session' '$client' {1}" \
+		--bind "alt-d:transform:'$self' --delete '${dir:?}' '$session' '$client' {1} force" \
+		--preview "bat --color=always --style=numbers --highlight-line {3} --file-name {4} '${dir:?}'/{1}" \
+		--preview-window 'right,60%,+{3}-/2'
+	items() { list_buffers; }
+	open() { IFS= read -r name < "${dir:?}/${1:?}.name"; echo "buffer $(kq "$name")"; } ;;
+files)
+	title=files
+	legend='enter:open ctrl-s:split-below ctrl-v/alt-v:split-right'
+	set -- \
+		--scheme path \
+		--preview "bat --color=always --style=numbers {}" \
+		--preview-window 'right,60%'
+	# hidden paths after the rest: fd sorts small results, and "." sorts first.
+	# Two walks rather than one sort, so big trees still stream into fzf.
+	items() {
+		fd --type f --strip-cwd-prefix --color never
+		fd --type f --hidden --exclude .git --strip-cwd-prefix --color never | grep -E '(^|/)\.'
+	}
+	open() { echo "edit $(kq "$1")"; } ;;
+locations|grep|workspace-symbols|changed)
+	legend='enter:open ctrl-s:split-below ctrl-v/alt-v:split-right'
+	set -- \
+		--ansi --delimiter '\t' --with-nth 4 \
+		--preview "bat --color=always --style=numbers --highlight-line {2} -- {1}" \
+		--preview-window 'right,55%,+{2}-/2'
+	case $kind in
+	locations)
+		IFS= read -r root < "$dir/root"
+		IFS= read -r type < "$dir/type"
+		IFS= read -r title < "$dir/title"
+		only=; [ -e "$dir/only" ] && IFS= read -r only < "$dir/only"
+		case $type in
+		lsp-diagnostics) title=diagnostics; [ -n "$only" ] || title='workspace diagnostics' ;;
+		lsp-document-symbol) title=symbols ;;
+		*) title=${title#\*}; title=${title%\*}; [ "$title" = goto ] && title=locations ;;
+		esac
+		set -- "$@" --no-sort
+		# (the files have no final newline: the last line is read anyway)
+		items() { { cat "$dir/list"; echo; } | format_locations "$root" "$type" "$only"; } ;;
+	grep)
+		title='global search'
+		set -- "$@" --disabled --prompt '/ ' \
+			--bind "change:reload:'$self' --grep {q}"
+		items() { :; } ;;
+	workspace-symbols)
+		title='workspace symbols'
+		set -- "$@" --disabled \
+			--bind "change:reload:sleep 0.15; '$self' --wsym '${dir:?}' '$session' '$client' {q}"
+		items() { :; }
+		# a symbol request still out mustn't take over the next list
+		trap 'rm -rf -- "${dir:?}"; send "evaluate-commands -client $client %{ set-option window picker_wsym_out %{} }"' EXIT ;;
+	changed)
+		title='changed files'
+		root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+			echo "kak-picker: not in a git repository" >&2; exit 1; }
+		cd "$root" || exit
+		set -- "$@" --preview "'$self' --diff {1}" --preview-window 'right,60%'
+		# `XY path` (or `XY old -> new`): + new, - deleted, ~ changed
+		items() {
+			git status --porcelain=v1 --untracked-files=all | while IFS= read -r l; do
+				st=${l%"${l#??}"} path=${l#???}
+				case $path in *' -> '*) path=${path#* -> } ;; esac
+				case $st in
+				'??'|A*|?A) mark="$git_add+" ;;
+				D*|?D) mark="$git_del-" ;;
+				R*) mark="$git_mod→" ;;
+				*) mark="$git_mod~" ;;
+				esac
+				printf '%s\t1\t1\t%s %s%s\n' "$root/$path" "$mark" "$PICKER_FG" "$path"
+			done
+		} ;;
+	esac
+	open() {
+		file=${1%%"$tab"*} r=${1#*"$tab"} line=${r%%"$tab"*} r=${r#*"$tab"} col=${r%%"$tab"*}
+		echo "edit -existing $(kq "$file") $line $col"
+	} ;;
+*)
+	echo "kak-picker: unknown kind: $kind" >&2; exit 1 ;;
+esac
+
+# The legend: keys in the accent, actions in the default text colour,
+# on the default background (it sits outside the frame).
+esc=$(printf '\033')
+sgr "$dbg" 4; bgp=$v; sgr "$dfg" 3; fgp=$v; sgr "$accent" 3; accp=$v; sgr "$dim" 3; dimp=$v
+PICKER_LEGEND="$esc[${bgp}m $esc[${fgp}m" sep=
+for item in $legend; do
+	PICKER_LEGEND="$PICKER_LEGEND$sep$esc[${accp}m${item%%:*} $esc[${fgp}m${item#*:}"
+	sep="  $esc[${dimp}m·  "
+done
+export PICKER_LEGEND
+
+# The popup is borderless: fzf draws the frame (title on top, where warnings
+# also go) in all but the last row, and the legend sits under it as plain text.
+# fzf clears that row on startup, so the legend is drawn from its start event.
+rows=$(stty size </dev/tty); rows=${rows%% *}
+
+# ESCDELAY: how long fzf waits after an Escape for the rest of a key sequence
+# before taking it as the Escape key (100 ms by default, which esc-to-close
+# makes felt). tmux delivers sequences like alt-d whole, so 10 ms is plenty.
+out=$(
+	items | ESCDELAY=10 fzf "$@" --height $((rows - 1)) --expect ctrl-s,ctrl-v,alt-v \
+		--reverse --cycle --info inline-right \
+		--border rounded --border-label " $title " --border-label-pos 3 \
+		--color "fg:$cmfg,bg:$cmbg,preview-fg:$cmfg,preview-bg:$cmbg,gutter:$cmbg" \
+		--color "fg+:$csfg,bg+:$csbg,hl+:$csfg:bold:underline,pointer:$csfg" \
+		--color "hl:$caccent,prompt:$caccent,marker:$caccent,spinner:$caccent,query:$cmfg" \
+		--color "info:$cdim,separator:$cdim,scrollbar:$cdim" \
+		--color "border:$cmfg,preview-border:$cmfg,label:$cmfg:bold" \
+		--bind "start:execute-silent:'$self' --legend $rows"
+) || exit 0
+key=$(printf '%s\n' "$out" | sed -n 1p)
+pick=$(printf '%s\n' "$out" | sed -n 2p)
+[ -n "$pick" ] || exit 0
+cmd=$(open "$pick")
+
+case $key in
+ctrl-s|ctrl-v|alt-v)
+	[ "$key" = ctrl-s ] && split=-v || split=-h
+	send "evaluate-commands -client $client $(kq "split-with $split $(kq "$cmd")")" ;;
+*)
+	send "evaluate-commands -client $client $(kq "$cmd")" ;;
+esac
