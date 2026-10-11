@@ -130,6 +130,8 @@ mode = "0644"
 "~/.config/kakbr/kakbr.conf" = { source = "dotfiles/config/kakbr/kakbr.conf", mode = "symlink" }
 "~/.config/kak/bin/kak-picker" = { source = "dotfiles/config/kak/bin/kak-picker", mode = "symlink" }
 "~/.config/kak/bin/kakmux-even" = { source = "dotfiles/config/kak/bin/kakmux-even", mode = "symlink" }
+"~/.config/helix/config.toml" = { source = "dotfiles/config/helix/config.toml", mode = "symlink" }
+"~/.config/helix/languages.toml" = { source = "dotfiles/config/helix/languages.toml", mode = "symlink" }
 "~/.config/starship.toml" = { source = "dotfiles/config/starship.toml", mode = "symlink" }
 "~/.config/broot/conf.hjson" = { source = "dotfiles/config/broot/conf.hjson", mode = "symlink" }
 "~/.config/broot/verbs.hjson" = { source = "dotfiles/config/broot/verbs.hjson", mode = "symlink" }
