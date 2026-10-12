@@ -3,6 +3,7 @@
 # pacman, and the bootstrap reads this file with Arch's.
 Server = https://cdn77.cachyos.org/repo/x86_64_v4/$repo
 Server = https://at.cachyos.org/repo/x86_64_v4/$repo
-Server = https://us.cachyos.org/repo/x86_64_v4/$repo
 Server = https://nl.mirror.cx/cachyos/repo/x86_64_v4/$repo
+Server = https://no.mirror.cx/cachyos/repo/x86_64_v4/$repo
+Server = https://mirror.zyner.org/mirror/cachyos/repo/x86_64_v4/$repo
 Server = https://cachyos.doridian.net/repo/x86_64_v4/$repo
