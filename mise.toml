@@ -76,6 +76,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 # dev
 "pacman:git" = "latest"
 "pacman:git-delta" = "latest"
+"pacman:git-filter-repo" = "latest"
 "pacman:gcc" = "latest"
 "pacman:clang" = "latest"
 "pacman:mingw-w64-gcc" = "latest"     # Windows cross-compiler (~/tracehook)
@@ -132,6 +133,7 @@ mode = "0644"
 [dotfiles]
 "~/.zshrc" = { source = "dotfiles/zshrc", mode = "symlink" }
 "~/.gitconfig" = { source = "dotfiles/gitconfig", mode = "symlink" }
+"~/.config/git/ignore" = { source = "dotfiles/config/git/ignore", mode = "symlink" }
 "~/.config/kak/kakrc" = { source = "dotfiles/config/kak/kakrc", mode = "symlink" }
 "~/.config/kak/colors/onedark.kak" = { source = "dotfiles/config/kak/colors/onedark.kak", mode = "symlink" }
 "~/.config/kak/kakmux.conf" = { source = "dotfiles/config/kak/kakmux.conf", mode = "symlink" }
@@ -140,8 +142,6 @@ mode = "0644"
 "~/.config/kak/shell/kakmux.zsh" = { source = "dotfiles/config/kak/shell/kakmux.zsh", mode = "symlink" }
 "~/.config/kakbr/kakbr.conf" = { source = "dotfiles/config/kak/kakbr/kakbr.conf", mode = "symlink" }
 "~/.config/kakbr/broot.hjson" = { source = "dotfiles/config/kak/kakbr/broot.hjson", mode = "symlink" }
-"~/.config/helix/config.toml" = { source = "dotfiles/config/helix/config.toml", mode = "symlink" }
-"~/.config/helix/languages.toml" = { source = "dotfiles/config/helix/languages.toml", mode = "symlink" }
 "~/.config/starship.toml" = { source = "dotfiles/config/starship.toml", mode = "symlink" }
 "~/.config/broot/conf.hjson" = { source = "dotfiles/config/broot/conf.hjson", mode = "symlink" }
 "~/.config/broot/verbs.hjson" = { source = "dotfiles/config/broot/verbs.hjson", mode = "symlink" }
