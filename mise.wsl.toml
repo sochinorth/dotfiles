@@ -1,21 +1,28 @@
 # WSL module, layered on top of mise.toml:
-#   mise -E wsl bootstrap
+#	mise -E wsl bootstrap
 # (.miserc.local.toml can select it by default on a WSL machine.)
 # Sources live in wsl/. Remove everything this module manages with
-#   mise bootstrap unapply wsl
+#	mise bootstrap unapply wsl
 
 # The Windows side, under the Windows user's home (wsl/bin/winhome asks
 # Windows where it is; mise can't put a dotfile at a path it has to find out):
-# - .wslconfig, a copy: Windows can't follow a symlink into the WSL filesystem
+# - .wslconfig, a copy: Windows can't follow a symlink into the WSL filesystem.
+#   Its memory= is 85% of the host's RAM, asked of Windows (~1 s) each time.
 # - the xclip shim is only half of the clipboard: win32yank.exe lives there
 [bootstrap.hooks]
-final = """
+final = '''
 home=$('{{ config_root }}/wsl/bin/winhome') || exit 1
-cmp -s '{{ config_root }}/wsl/wslconfig' "$home/.wslconfig" \
-  || { cp '{{ config_root }}/wsl/wslconfig' "$home/.wslconfig" && echo "wrote $home/.wslconfig"; }
+ram=$(cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
+	-Command '(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory' | tr -d '\r')
+case $ram in
+''|*[!0-9]*) echo "Windows didn't say how much RAM it has" >&2; exit 1 ;;
+esac
+conf=$(awk -v gb=$((ram / 20 * 17 >> 30)) '{ print } /^\[wsl2\]$/ { print "memory=" gb "GB" }' '{{ config_root }}/wsl/wslconfig')
+[ "$conf" = "$(cat "$home/.wslconfig" 2>/dev/null)" ] \
+	|| { printf '%s\n' "$conf" > "$home/.wslconfig" && echo "wrote $home/.wslconfig"; }
 test -x "$home/.local/bin/win32yank.exe" \
-  || echo "warning: win32yank.exe missing from $home/.local/bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)"
-"""
+	|| echo "warning: win32yank.exe missing from $home/.local/bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)"
+'''
 
 # systemd on, default user, hostname, Windows PATH off (wsl/zsh/wsl.zsh adds back only what it needs)
 [bootstrap.files."/etc/wsl.conf"]

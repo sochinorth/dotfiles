@@ -1,10 +1,10 @@
 # Generic Arch setup (Zen 4): CachyOS znver4 + Chaotic-AUR repos (+ my own sochinorth repo), doas
 # with fudo standing in for sudo. Platform modules layer on top:
-#   mise bootstrap            # this file only (+ whatever .miserc.local.toml selects)
-#   mise -E wsl bootstrap     # + mise.wsl.toml
+#	mise bootstrap			# this file only (+ whatever .miserc.local.toml selects)
+#	mise -E wsl bootstrap	# + mise.wsl.toml
 #
 # Fresh machine: install-root.sh as root once, then as your user:
-#   mise trust && mise [-E wsl] bootstrap
+#	mise trust && mise [-E wsl] bootstrap
 # See README.md for the order things happen in and why.
 
 # --- hooks -------------------------------------------------------------------
@@ -39,8 +39,8 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:cachyos-v4-mirrorlist" = "latest"
 "pacman:chaotic-keyring" = "latest"
 "pacman:chaotic-mirrorlist" = "latest"
-"pacman:paru" = "latest"              # cachyos; AUR helper behind mise's aur: manager
-"pacman:opendoas" = "latest"          # pulled in by fudo-git, declared because everything hinges on it
+"pacman:paru" = "latest"			# cachyos; AUR helper behind mise's aur: manager
+"pacman:opendoas" = "latest"		# pulled in by fudo-git, declared because everything hinges on it
 # sudo -> doas shim. The pre-packages hook installs it (mise's own sudo calls
 # need it first); declared here so status and `packages upgrade` cover it.
 "aur:fudo-git" = "latest"
@@ -57,7 +57,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:bat" = "latest"
 "pacman:eza" = "latest"
 "pacman:fd" = "latest"
-"pacman:ripgrep" = "latest"         # kak global search (<space>/)
+"pacman:ripgrep" = "latest"			# kak global search (<space>/)
 "pacman:sd" = "latest"
 "pacman:jq" = "latest"
 "pacman:xh" = "latest"
@@ -66,13 +66,13 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:procs" = "latest"
 "pacman:btop" = "latest"
 "pacman:broot" = "latest"
-"pacman:walk" = "latest"              # chaotic-aur; used by lk() in .zshrc
+"pacman:walk" = "latest"			# chaotic-aur; used by lk() in .zshrc
 "pacman:tealdeer" = "latest"
 "pacman:just" = "latest"
 "pacman:kakoune" = "latest"
 "pacman:kakoune-lsp" = "latest"
-"pacman:kak-tree-sitter" = "latest"   # sochinorth repo (built by GitHub Actions); grammars: ktsctl sync (post-dotfiles hook)
-"pacman:tmux" = "latest"               # kakmux (~/.local/bin, the kakmux submodule): kak with a tmux-drawn bufferline; kakbr
+"pacman:kak-tree-sitter" = "latest"	# sochinorth repo (built by GitHub Actions); grammars: ktsctl sync (post-dotfiles hook)
+"pacman:tmux" = "latest"			# kakmux (~/.local/bin, the kakmux submodule): kak with a tmux-drawn bufferline; kakbr
 
 # dev
 "pacman:git" = "latest"
@@ -80,7 +80,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:git-filter-repo" = "latest"
 "pacman:gcc" = "latest"
 "pacman:clang" = "latest"
-"pacman:mingw-w64-gcc" = "latest"     # Windows cross-compiler
+"pacman:mingw-w64-gcc" = "latest"	# Windows cross-compiler
 "pacman:make" = "latest"
 "pacman:cmake" = "latest"
 "pacman:diffutils" = "latest"

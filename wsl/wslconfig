@@ -1,5 +1,4 @@
 [wsl2]
-memory=25769803776
 networkingMode=Consomme
 autoProxy=false
 dnsProxy=false
