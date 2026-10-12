@@ -21,7 +21,7 @@ fi
 ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline toml json yaml
 
 # Agent skills (submodules in dotfiles/skills), one link per skill: in
-# ~/.agents/skills, which OpenCode and other agent tools read, and in
+# ~/.agents/skills, which other agent tools read, and in
 # ~/.claude/skills for Claude Code. A skill's directory must be named after
 # it (its SKILL.md's name:). Links into here that lead nowhere any more go.
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)

@@ -1,8 +1,5 @@
-Host cudy-wr3000s
-	HostName 192.168.0.1
-	User root
-	IdentityFile ~/.ssh/id_ed25519_openwrt
-	IdentitiesOnly yes
+# this machine's own hosts, not in the repo
+Include config.local
 
 Host github.com
 	HostName github.com

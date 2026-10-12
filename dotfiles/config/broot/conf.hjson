@@ -73,15 +73,5 @@ preview_transformers: [
 
 imports: [
 	verbs.hjson
-	{
-		luma: [
-			dark
-			unknown
-		]
-		file: skins/onedark.hjson
-	}
-	{
-		luma: light
-		file: skins/white.hjson
-	}
+	skins/onedark.hjson
 ]

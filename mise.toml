@@ -100,7 +100,6 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 
 # AI tools (cachyos repo)
 "pacman:claude-code" = "latest"
-"pacman:opencode" = "latest"
 
 # --- system files (written through sudo = fudo -> doas) ----------------------
 
@@ -157,7 +156,6 @@ mode = "0644"
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
 "~/.config/btop/btop.conf" = { source = "dotfiles/config/btop/btop.conf", mode = "copy" }
-"~/.config/opencode/cli.json" = { source = "dotfiles/config/opencode/cli.json", mode = "copy" }
 
 # Keys are not in this repo; copy them over by hand. These only fix permissions.
 "~/.ssh" = { permissions = "0700" }
@@ -165,7 +163,6 @@ mode = "0644"
 # whose signatures git trusts (gpg.ssh.allowedSignersFile): the github key's public half
 "~/.ssh/allowed_signers" = { source = "dotfiles/ssh/allowed_signers", mode = "symlink" }
 "~/.ssh/id_ed25519_github" = { permissions = "0600" }
-"~/.ssh/id_ed25519_openwrt" = { permissions = "0600" }
 
 # --- account -----------------------------------------------------------------
 

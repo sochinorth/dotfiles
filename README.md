@@ -43,7 +43,7 @@ git clone --recurse-submodules <this repo> ~/setup && cd ~/setup
 mise trust && mise -E wsl bootstrap --dry-run && mise -E wsl bootstrap   # drop -E wsl on bare metal
 ```
 
-Then copy `~/.ssh/id_ed25519_*` over by hand (keys are deliberately not in the repo).
+Then copy `~/.ssh/id_ed25519_*` over by hand (keys are deliberately not in the repo). Hosts that only matter on one machine go in `~/.ssh/config.local`, which `~/.ssh/config` includes.
 
 The Kakoune config (`dotfiles/config/kak`) and the agent skills
 (`dotfiles/skills/*`) are submodules, cloned over HTTPS (no keys needed yet). A
@@ -75,7 +75,7 @@ That dependency chain fixes the order:
 - `makepkg.conf` (`-march=native -O3`, LTO) is not tracked: it ships that way in CachyOS's `pacman`.
 - WSL: `appendWindowsPath = false` in `wsl.conf`. The WSL drop-in adds back only System32 and `%USERPROFILE%\.local\bin` (where win32yank lives). The Windows home is found, not configured: `wsl/bin/winhome` asks Windows once (`%USERPROFILE%`) and caches the answer in `~/.cache/wsl-winhome`.
 - WSL: `.wslconfig` (mirrored networking, 24 GiB) is copied to the Windows side by the `final` hook, not symlinked, and not a `[dotfiles]` entry (its path depends on the Windows user).
-- btop and opencode rewrite their own configs, so those are copies. After changing settings in the app, run `mise dot add <path>`.
+- btop rewrites its own config, so that one is a copy. After changing settings in the app, run `mise dot add <path>`.
 - broot opens files in Kakoune: Enter is a verb in `verbs.hjson`; double-click is hard-wired to the system opener, so `broot-open` is also installed as `wslview`/`xdg-open` in `~/.local/lib/broot-opener`, a dir only broot gets on PATH (`broot()` in kakmux's `shell/kakmux.zsh`, which `.zshrc` sources; `kakbr-sidebar`). In `kakbr`'s sidebar both go to kakbr's kak; elsewhere in tmux, to a kak pane in broot's window (kakrc labels each kak client's pane). `kakmux` and `kakbr` each run their own tmux server (`kakmux-PID`, `kakbr-PID`), so each is one pane in whatever runs it; kakbr's right pane is just a `kakmux`.
 - kak-tree-sitter turns off Kakoune's own highlighting for every language it knows, grammar installed or not. So kakrc writes `~/.config/kak-tree-sitter/config.toml` (not tracked; regenerated when the installed set changes) to hand every language without a grammar back to Kakoune. The post-dotfiles hook installs a handful (C/C++, Rust, Python, Bash, Markdown, TOML, JSON, YAML); add more with `ktsctl sync <lang>`.
 - Not captured: secrets (SSH keys, app credentials), project checkouts, timezone/hostname files that WSL generates. What that means on a given machine goes in its `README.local.md`.
