@@ -1,0 +1,4 @@
+[submodule "dotfiles/config/kak"]
+	path = dotfiles/config/kak
+	url = git@github.com:sochinorth/kakmux.git
+	branch = trunk

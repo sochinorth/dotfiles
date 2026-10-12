@@ -33,12 +33,12 @@ if (( wsl )); then
 
 Root stage done. From Windows run:  wsl --terminate archlinux
 Then, logged in as $user:
-  git clone <this repo> ~/setup && cd ~/setup && mise trust && mise -E wsl bootstrap
+  git clone --recurse-submodules <this repo> ~/setup && cd ~/setup && mise trust && mise -E wsl bootstrap
 EOF
 else
 	cat <<EOF
 
 Root stage done. Log in as $user, then:
-  git clone <this repo> ~/setup && cd ~/setup && mise trust && mise bootstrap
+  git clone --recurse-submodules <this repo> ~/setup && cd ~/setup && mise trust && mise bootstrap
 EOF
 fi

@@ -12,6 +12,13 @@
 [bootstrap.hooks]
 # Repos, keys and fudo-git must exist before mise installs packages with `sudo`.
 pre-packages = "bash '{{ config_root }}/scripts/pre-packages.sh'"
+# The Kakoune config is a submodule (dotfiles/config/kak, the kakmux repo):
+# checked out here when the clone was made without --recurse-submodules.
+# One already checked out is left alone (it's the live config, maybe ahead).
+pre-dotfiles = """
+cd '{{ config_root }}' || exit
+if git submodule status | grep -q '^-'; then git submodule update --init; fi
+"""
 post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 
 # --- packages ----------------------------------------------------------------
@@ -64,7 +71,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:kakoune" = "latest"
 "pacman:kakoune-lsp" = "latest"
 "pacman:kak-tree-sitter" = "latest"   # sochinorth repo (built by GitHub Actions); grammars: ktsctl sync (post-dotfiles hook)
-"pacman:tmux" = "latest"               # kakmux (~/.local/bin): kak with a tmux-drawn bufferline; kakbr
+"pacman:tmux" = "latest"               # kakmux (~/.local/bin, the kakmux submodule): kak with a tmux-drawn bufferline; kakbr
 
 # dev
 "pacman:git" = "latest"
@@ -119,7 +126,8 @@ mode = "0644"
 
 # --- dotfiles ----------------------------------------------------------------
 # Edited-in-place configs are symlinks into this repo. Configs that their app
-# rewrites are copies.
+# rewrites are copies. Everything Kakoune (kak, kakbr, kakmux, broot-open) is
+# in the kakmux submodule at dotfiles/config/kak.
 
 [dotfiles]
 "~/.zshrc" = { source = "dotfiles/zshrc", mode = "symlink" }
@@ -127,9 +135,11 @@ mode = "0644"
 "~/.config/kak/kakrc" = { source = "dotfiles/config/kak/kakrc", mode = "symlink" }
 "~/.config/kak/colors/onedark.kak" = { source = "dotfiles/config/kak/colors/onedark.kak", mode = "symlink" }
 "~/.config/kak/kakmux.conf" = { source = "dotfiles/config/kak/kakmux.conf", mode = "symlink" }
-"~/.config/kakbr/kakbr.conf" = { source = "dotfiles/config/kakbr/kakbr.conf", mode = "symlink" }
 "~/.config/kak/bin/kak-picker" = { source = "dotfiles/config/kak/bin/kak-picker", mode = "symlink" }
 "~/.config/kak/bin/kakmux-even" = { source = "dotfiles/config/kak/bin/kakmux-even", mode = "symlink" }
+"~/.config/kak/shell/kakmux.zsh" = { source = "dotfiles/config/kak/shell/kakmux.zsh", mode = "symlink" }
+"~/.config/kakbr/kakbr.conf" = { source = "dotfiles/config/kak/kakbr/kakbr.conf", mode = "symlink" }
+"~/.config/kakbr/broot.hjson" = { source = "dotfiles/config/kak/kakbr/broot.hjson", mode = "symlink" }
 "~/.config/helix/config.toml" = { source = "dotfiles/config/helix/config.toml", mode = "symlink" }
 "~/.config/helix/languages.toml" = { source = "dotfiles/config/helix/languages.toml", mode = "symlink" }
 "~/.config/starship.toml" = { source = "dotfiles/config/starship.toml", mode = "symlink" }
@@ -137,11 +147,11 @@ mode = "0644"
 "~/.config/broot/verbs.hjson" = { source = "dotfiles/config/broot/verbs.hjson", mode = "symlink" }
 "~/.config/broot/skins/*.hjson" = { source = "dotfiles/config/broot/skins/*.hjson", mode = "symlink" }
 # Enter (verbs.hjson) and double-click (opener shims, on broot's PATH only) -> broot-open -> kak (kakbr's, or a kak pane in broot's tmux window)
-"~/.local/bin/broot-open" = { source = "dotfiles/local/bin/broot-open", mode = "symlink" }
-"~/.local/lib/broot-opener/wslview" = { source = "dotfiles/local/bin/broot-open", mode = "symlink" }
-"~/.local/lib/broot-opener/xdg-open" = { source = "dotfiles/local/bin/broot-open", mode = "symlink" }
-"~/.local/bin/kakbr-sidebar" = { source = "dotfiles/local/bin/kakbr-sidebar", mode = "symlink" }
-"~/.local/bin/kakmux" = { source = "dotfiles/local/bin/kakmux", mode = "symlink" }
+"~/.local/bin/broot-open" = { source = "dotfiles/config/kak/scripts/broot-open", mode = "symlink" }
+"~/.local/lib/broot-opener/wslview" = { source = "dotfiles/config/kak/scripts/broot-open", mode = "symlink" }
+"~/.local/lib/broot-opener/xdg-open" = { source = "dotfiles/config/kak/scripts/broot-open", mode = "symlink" }
+"~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
+"~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
 "~/.config/btop/btop.conf" = { source = "dotfiles/config/btop/btop.conf", mode = "copy" }
 "~/.config/opencode/cli.json" = { source = "dotfiles/config/opencode/cli.json", mode = "copy" }
 
