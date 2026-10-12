@@ -4,11 +4,17 @@
 # Sources live in wsl/. Remove everything this module manages with
 #   mise bootstrap unapply wsl
 
-# The xclip shim is only half of the clipboard: win32yank.exe lives on the Windows side.
+# The Windows side, under the Windows user's home (wsl/bin/winhome asks
+# Windows where it is; mise can't put a dotfile at a path it has to find out):
+# - .wslconfig, a copy: Windows can't follow a symlink into the WSL filesystem
+# - the xclip shim is only half of the clipboard: win32yank.exe lives there
 [bootstrap.hooks]
 final = """
-test -x /mnt/c/Users/NAME/.local/bin/win32yank.exe \
-  || echo 'warning: win32yank.exe missing from C:\\Users\\NAME\\.local\\bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)'
+home=$('{{ config_root }}/wsl/bin/winhome') || exit 1
+cmp -s '{{ config_root }}/wsl/wslconfig' "$home/.wslconfig" \
+  || { cp '{{ config_root }}/wsl/wslconfig' "$home/.wslconfig" && echo "wrote $home/.wslconfig"; }
+test -x "$home/.local/bin/win32yank.exe" \
+  || echo "warning: win32yank.exe missing from $home/.local/bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)"
 """
 
 # systemd on, default user, hostname, Windows PATH off (wsl/zsh/wsl.zsh adds back only what it needs)
@@ -27,5 +33,3 @@ mode = "0755"
 
 [dotfiles]
 "~/.config/zsh/conf.d/wsl.zsh" = { source = "wsl/zsh/wsl.zsh", mode = "symlink" }
-# Windows side, so a copy: Windows can't follow a symlink into the WSL filesystem
-"/mnt/c/Users/NAME/.wslconfig" = { source = "wsl/wslconfig", mode = "copy" }
