@@ -158,6 +158,8 @@ mode = "0644"
 # Keys are not in this repo; copy them over by hand. These only fix permissions.
 "~/.ssh" = { permissions = "0700" }
 "~/.ssh/config" = { source = "dotfiles/ssh/config", mode = "copy", permissions = "0600" }
+# whose signatures git trusts (gpg.ssh.allowedSignersFile): the github key's public half
+"~/.ssh/allowed_signers" = { source = "dotfiles/ssh/allowed_signers", mode = "symlink" }
 "~/.ssh/id_ed25519_github" = { permissions = "0600" }
 "~/.ssh/id_ed25519_openwrt" = { permissions = "0600" }
 
