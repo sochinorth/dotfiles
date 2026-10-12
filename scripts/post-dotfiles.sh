@@ -38,3 +38,17 @@ for dir in ~/.agents/skills ~/.claude/skills; do
 		fi
 	done
 done
+
+# fortune needs an index (.dat, from strfile) beside each cookie file mise
+# links into ~/.local/share/fortune; rebuilt when the file is newer. Links to
+# files that left the repo go, and so do indexes without a file.
+shopt -s nullglob
+for f in ~/.local/share/fortune/*; do
+	if [[ -L $f && ! -e $f ]]; then
+		rm -- "$f"
+	elif [[ $f == *.dat ]]; then
+		[[ -e ${f%.dat} ]] || rm -- "$f"
+	elif [[ ! $f.dat -nt $f ]]; then
+		strfile -s "$f" "$f.dat"
+	fi
+done

@@ -170,6 +170,8 @@ mode = "0644"
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
 "~/.config/btop/btop.conf" = { source = "dotfiles/config/btop/btop.conf", mode = "copy" }
+# fortune cookies beyond fortune-mod's; post-dotfiles indexes them, .zshrc reads them
+"~/.local/share/fortune/*" = { source = "dotfiles/fortune/*", mode = "symlink" }
 
 # Keys are not in this repo; copy them over by hand. These only fix permissions.
 "~/.ssh" = { permissions = "0700" }

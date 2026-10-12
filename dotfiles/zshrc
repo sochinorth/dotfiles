@@ -115,7 +115,7 @@ zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 zstyle ':completion:*' group-name ''
 
 if [[ -o interactive ]] && command -v fortune >/dev/null; then
-	fortune
+	fortune /usr/share/fortune ~/.local/share/fortune(N/)
 fi
 
 eval "$(starship init zsh)"
