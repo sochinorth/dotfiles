@@ -60,7 +60,7 @@ That dependency chain fixes the order:
 
 1. `install-root.sh` (root): user in `wheel`, `opendoas`, `/etc/doas.conf`. There is no sudo yet.
 2. `pre-packages` hook (`scripts/pre-packages.sh`, through doas):
-   - imports the CachyOS and Chaotic-AUR keys, seeds the mirrorlists, installs `pacman.conf`
+   - imports the CachyOS and Chaotic-AUR keys, installs the mirror lists and `pacman.conf`
    - installs the keyrings, then reinstalls everything from the znver4 repos (CachyOS's own procedure)
    - installs `paru` (prebuilt, cachyos repo), removes real sudo only after `doas true` succeeds, then `paru` installs fudo-git
 3. `[bootstrap.packages]`: pacman, now through sudo → fudo → doas; `aur:` entries through paru, which uses the stock `/etc/paru.conf` and elevates through sudo → fudo → doas too. Don't create an empty `~/.config/paru/paru.conf`: any user file replaces `/etc/paru.conf` and loses its defaults.

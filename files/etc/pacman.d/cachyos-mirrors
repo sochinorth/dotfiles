@@ -1,0 +1,8 @@
+# CachyOS: [cachyos]. Not the cachyos-mirrorlist package's list: that one
+# is long and lists dead mirrors; this file is ours, so updates leave it be.
+# CDN77 first (CachyOS's default), then CachyOS's own and well-synced ones.
+Server = https://cdn77.cachyos.org/repo/$arch/$repo
+Server = https://at.cachyos.org/repo/$arch/$repo
+Server = https://us.cachyos.org/repo/$arch/$repo
+Server = https://nl.mirror.cx/cachyos/repo/$arch/$repo
+Server = https://cachyos.doridian.net/repo/$arch/$repo

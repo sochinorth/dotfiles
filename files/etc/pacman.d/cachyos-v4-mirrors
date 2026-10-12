@@ -1,0 +1,8 @@
+# CachyOS: the *-znver4 repos, the same mirrors as cachyos-mirrors.
+# x86_64_v4 is spelled out: $arch_v4 only means something to CachyOS's own
+# pacman, and the bootstrap reads this file with Arch's.
+Server = https://cdn77.cachyos.org/repo/x86_64_v4/$repo
+Server = https://at.cachyos.org/repo/x86_64_v4/$repo
+Server = https://us.cachyos.org/repo/x86_64_v4/$repo
+Server = https://nl.mirror.cx/cachyos/repo/x86_64_v4/$repo
+Server = https://cachyos.doridian.net/repo/x86_64_v4/$repo

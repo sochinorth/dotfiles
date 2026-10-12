@@ -32,22 +32,17 @@ for key in F3B607488DB35A47 3056513887B78AEB; do
 	fi
 done
 
-# pacman.conf Includes these lists, and pacman refuses to start when one is
-# missing, so seed them; the *-mirrorlist packages take them over below.
-for list in cachyos cachyos-v3 cachyos-v4 chaotic; do
-	[[ -e /etc/pacman.d/$list-mirrorlist ]] \
-		|| doas install -m644 "$here/files/seed/$list-mirrorlist" /etc/pacman.d/
-done
-
-for f in pacman.conf pacman.d/mirrorlist; do
+# The mirror lists before pacman.conf: pacman refuses to start when a list it
+# Includes is missing. They're ours, not the *-mirrorlist packages'.
+for f in pacman.d/mirrorlist pacman.d/cachyos-mirrors pacman.d/cachyos-v4-mirrors \
+	pacman.d/chaotic-mirrors pacman.conf; do
 	same "$here/files/etc/$f" "/etc/$f" || doas install -m644 "$here/files/etc/$f" "/etc/$f"
 done
 
-repo_pkgs=(cachyos-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist
-	chaotic-keyring chaotic-mirrorlist)
+repo_pkgs=(cachyos-keyring chaotic-keyring)
 if ! pacman -Q "${repo_pkgs[@]}" >/dev/null 2>&1; then
 	say "enabling CachyOS + Chaotic-AUR"
-	doas pacman -Syu --noconfirm --overwrite '/etc/pacman.d/*-mirrorlist' "${repo_pkgs[@]}"
+	doas pacman -Syu --noconfirm "${repo_pkgs[@]}"
 	# Same as CachyOS's own installer: reinstall everything so it comes from the
 	# optimized repos (they're listed first in pacman.conf), pacman included.
 	pacman -Qqn | doas pacman -S --noconfirm -

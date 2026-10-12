@@ -1,0 +1,5 @@
+# Chaotic-AUR. geo routes to the nearest up-to-date mirror; cdn is
+# Cloudflare R2; de is a country mirror, last resort.
+Server = https://geo-mirror.chaotic.cx/$repo/$arch
+Server = https://cdn-mirror.chaotic.cx/$repo/$arch
+Server = https://de-mirror.chaotic.cx/$repo/$arch

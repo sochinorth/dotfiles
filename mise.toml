@@ -34,11 +34,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 
 # repo plumbing (installed first by the pre-packages hook)
 "pacman:cachyos-keyring" = "latest"
-"pacman:cachyos-mirrorlist" = "latest"
-"pacman:cachyos-v3-mirrorlist" = "latest"
-"pacman:cachyos-v4-mirrorlist" = "latest"
 "pacman:chaotic-keyring" = "latest"
-"pacman:chaotic-mirrorlist" = "latest"
 "pacman:paru" = "latest"			# cachyos; AUR helper behind mise's aur: manager
 "pacman:opendoas" = "latest"		# pulled in by fudo-git, declared because everything hinges on it
 # sudo -> doas shim. The pre-packages hook installs it (mise's own sudo calls
@@ -111,6 +107,24 @@ mode = "0644"
 
 [bootstrap.files."/etc/pacman.d/mirrorlist"]
 source = "files/etc/pacman.d/mirrorlist"
+owner = "root"
+group = "root"
+mode = "0644"
+
+[bootstrap.files."/etc/pacman.d/cachyos-mirrors"]
+source = "files/etc/pacman.d/cachyos-mirrors"
+owner = "root"
+group = "root"
+mode = "0644"
+
+[bootstrap.files."/etc/pacman.d/cachyos-v4-mirrors"]
+source = "files/etc/pacman.d/cachyos-v4-mirrors"
+owner = "root"
+group = "root"
+mode = "0644"
+
+[bootstrap.files."/etc/pacman.d/chaotic-mirrors"]
+source = "files/etc/pacman.d/chaotic-mirrors"
 owner = "root"
 group = "root"
 mode = "0644"
