@@ -19,3 +19,22 @@ fi
 # without one keep Kakoune's own highlighting (kakrc sees to that). More:
 # `ktsctl sync <lang>`, names from `ktsctl query -a`.
 ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline toml json yaml
+
+# Agent skills (submodules in dotfiles/skills), one link per skill: in
+# ~/.agents/skills, which OpenCode and other agent tools read, and in
+# ~/.claude/skills for Claude Code. A skill's directory must be named after
+# it (its SKILL.md's name:). Links into here that lead nowhere any more go.
+here=$(cd -- "$(dirname -- "$0")/.." && pwd)
+for dir in ~/.agents/skills ~/.claude/skills; do
+	mkdir -p "$dir"
+	for skill in "$here"/dotfiles/skills/*/plugins/*/skills/*/; do
+		[[ -e $skill/SKILL.md ]] || continue
+		skill=${skill%/}
+		ln -sfn "$skill" "$dir/${skill##*/}"
+	done
+	for link in "$dir"/*; do
+		if [[ -L $link && ! -e $link && $(readlink "$link") == "$here"/dotfiles/skills/* ]]; then
+			rm -- "$link"
+		fi
+	done
+done

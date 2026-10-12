@@ -1,4 +1,4 @@
-# Generic Arch setup (Ryzen 9 7945HX): CachyOS znver4 + Chaotic-AUR repos (+ my own sochinorth repo), doas
+# Generic Arch setup (Zen 4): CachyOS znver4 + Chaotic-AUR repos (+ my own sochinorth repo), doas
 # with fudo standing in for sudo. Platform modules layer on top:
 #   mise bootstrap            # this file only (+ whatever .miserc.local.toml selects)
 #   mise -E wsl bootstrap     # + mise.wsl.toml
@@ -12,9 +12,10 @@
 [bootstrap.hooks]
 # Repos, keys and fudo-git must exist before mise installs packages with `sudo`.
 pre-packages = "bash '{{ config_root }}/scripts/pre-packages.sh'"
-# The Kakoune config is a submodule (dotfiles/config/kak, the kakmux repo):
-# checked out here when the clone was made without --recurse-submodules.
-# One already checked out is left alone (it's the live config, maybe ahead).
+# Submodules (the Kakoune config, dotfiles/config/kak, is the kakmux repo;
+# agent skills in dotfiles/skills): checked out here when the clone was made
+# without --recurse-submodules. One already checked out is left alone (it's
+# the live config, maybe ahead).
 pre-dotfiles = """
 cd '{{ config_root }}' || exit
 if git submodule status | grep -q '^-'; then git submodule update --init; fi
@@ -79,8 +80,10 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:git-filter-repo" = "latest"
 "pacman:gcc" = "latest"
 "pacman:clang" = "latest"
-"pacman:mingw-w64-gcc" = "latest"     # Windows cross-compiler (~/tracehook)
+"pacman:mingw-w64-gcc" = "latest"     # Windows cross-compiler
 "pacman:make" = "latest"
+"pacman:cmake" = "latest"
+"pacman:diffutils" = "latest"
 "pacman:patch" = "latest"
 "pacman:fakeroot" = "latest"
 "pacman:gdb" = "latest"
