@@ -12,8 +12,8 @@
 	gpgsign = true
 [user]
 	email = 336912582+sochinorth@users.noreply.github.com
-    name = sochi north
-    signingkey = /home/sochinorth/.ssh/id_ed25519_github.pub
+	name = sochi north
+	signingkey = /home/sochinorth/.ssh/id_ed25519_github.pub
 [interactive]
 	diffFilter = delta --color-only
 [delta]
