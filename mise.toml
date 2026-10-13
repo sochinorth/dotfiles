@@ -151,6 +151,7 @@ mode = "0644"
 "~/.gitconfig" = { source = "dotfiles/gitconfig", mode = "symlink" }
 "~/.config/git/ignore" = { source = "dotfiles/config/git/ignore", mode = "symlink" }
 "~/.config/kak/kakrc" = { source = "dotfiles/config/kak/kakrc", mode = "symlink" }
+"~/.config/kak/rc/*.kak" = { source = "dotfiles/config/kak/rc/*.kak", mode = "symlink" }
 "~/.config/kak/colors/onedark.kak" = { source = "dotfiles/config/kak/colors/onedark.kak", mode = "symlink" }
 "~/.config/kak/kakmux.conf" = { source = "dotfiles/config/kak/kakmux.conf", mode = "symlink" }
 "~/.config/kak/bin/kak-picker" = { source = "dotfiles/config/kak/bin/kak-picker", mode = "symlink" }
