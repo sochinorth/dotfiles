@@ -159,6 +159,7 @@ mode = "0644"
 "~/.config/kakbr/kakbr.conf" = { source = "dotfiles/config/kak/kakbr/kakbr.conf", mode = "symlink" }
 "~/.config/kakbr/broot.hjson" = { source = "dotfiles/config/kak/kakbr/broot.hjson", mode = "symlink" }
 "~/.config/kakbr/window-keys" = { source = "dotfiles/config/kak/kakbr/window-keys", mode = "symlink" }
+"~/.config/kakbr/float" = { source = "dotfiles/config/kak/kakbr/float", mode = "symlink" }
 "~/.config/starship.toml" = { source = "dotfiles/config/starship.toml", mode = "symlink" }
 "~/.config/broot/conf.hjson" = { source = "dotfiles/config/broot/conf.hjson", mode = "symlink" }
 "~/.config/broot/verbs.hjson" = { source = "dotfiles/config/broot/verbs.hjson", mode = "symlink" }
