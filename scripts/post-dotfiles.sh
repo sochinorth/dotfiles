@@ -20,6 +20,22 @@ fi
 # `ktsctl sync <lang>`, names from `ktsctl query -a`.
 ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline toml json yaml
 
+# ~/.claude.go (claude-go in .zshrc) is Claude Code on OpenCode Go. It keeps its
+# own credentials, app state (.claude.json), settings.json (what /model, /theme
+# and /config save; the shared settings are managed ones) and what mise links in
+# (settings.go.json: theme and upstream); everything else is ~/.claude's. A real
+# file or directory where a link belongs is left for you to merge into ~/.claude.
+for f in CLAUDE.md keybindings.json history.jsonl \
+	projects skills agents commands hooks rules output-styles workflows plugins plans themes; do
+	src=~/.claude/$f dst=~/.claude.go/$f
+	[[ $f == *.* ]] || mkdir -p "$src"
+	if [[ -L $dst || ! -e $dst ]]; then
+		ln -sfn "$src" "$dst"
+	else
+		echo "post-dotfiles: $dst should link to $src; merge it there and remove it" >&2
+	fi
+done
+
 # fortune needs an index (.dat, from strfile) beside each cookie file mise
 # links into ~/.local/share/fortune; rebuilt when the file is newer. Links to
 # files that left the repo go, and so do indexes without a file.

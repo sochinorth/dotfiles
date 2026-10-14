@@ -1,0 +1,257 @@
+{
+  "host": "127.0.0.1",
+  "port": 3456,
+  "respect_requested_model": true,
+  "models": {
+    "default": {
+      "provider": "opencode-go",
+      "model_id": "glm-5.3",
+      "max_tokens": 131072,
+      "vision": false
+    },
+    "glm-5.3": {
+      "provider": "opencode-go",
+      "model_id": "glm-5.3",
+      "max_tokens": 131072,
+      "vision": false
+    },
+    "minimax-m3": {
+      "provider": "opencode-go",
+      "model_id": "minimax-m3",
+      "max_tokens": 131072,
+      "vision": true,
+      "wire_format": "anthropic"
+    },
+    "qwen3.8-max": {
+      "provider": "opencode-go",
+      "model_id": "qwen3.8-max",
+      "max_tokens": 131072,
+      "vision": true,
+      "wire_format": "anthropic"
+    },
+    "kimi-k3": {
+      "provider": "opencode-go",
+      "model_id": "kimi-k3",
+      "max_tokens": 131072,
+      "vision": true
+    },
+    "deepseek-v4-pro": {
+      "provider": "opencode-go",
+      "model_id": "deepseek-v4-pro",
+      "max_tokens": 384000,
+      "vision": false
+    },
+    "qwen3.8-flash": {
+      "provider": "opencode-go",
+      "model_id": "qwen3.8-flash",
+      "max_tokens": 131072,
+      "vision": true,
+      "wire_format": "anthropic"
+    },
+    "cat-jam-free": {
+      "provider": "opencode-go",
+      "model_id": "cat-jam-free",
+      "max_tokens": 131072,
+      "vision": false
+    },
+    "claude-haiku-5-5": {
+      "provider": "opencode-go",
+      "model_id": "claude-haiku-5-5",
+      "max_tokens": 128000,
+      "vision": true,
+      "wire_format": "anthropic"
+    },
+    "deepseek-v4.1-flash": {
+      "provider": "opencode-go",
+      "model_id": "deepseek-v4.1-flash",
+      "max_tokens": 384000,
+      "vision": true
+    },
+    "glm-5.2": {
+      "provider": "opencode-go",
+      "model_id": "glm-5.2",
+      "max_tokens": 131072,
+      "vision": false
+    },
+    "glm-5.3-flash": {
+      "provider": "opencode-go",
+      "model_id": "glm-5.3-flash",
+      "max_tokens": 131072,
+      "vision": true
+    },
+    "gpt-5.6-luna": {
+      "provider": "opencode-go",
+      "model_id": "gpt-5.6-luna",
+      "max_tokens": 128000,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "gpt-6-luna": {
+      "provider": "opencode-go",
+      "model_id": "gpt-6-luna",
+      "max_tokens": 128000,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "grok-4.6": {
+      "provider": "opencode-go",
+      "model_id": "grok-4.6",
+      "max_tokens": 500000,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "grok-4.7": {
+      "provider": "opencode-go",
+      "model_id": "grok-4.7",
+      "max_tokens": 500000,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "hy3": {
+      "provider": "opencode-go",
+      "model_id": "hy3",
+      "max_tokens": 128000,
+      "vision": false
+    },
+    "hy4-preview": {
+      "provider": "opencode-go",
+      "model_id": "hy4-preview",
+      "max_tokens": 64000,
+      "vision": false
+    },
+    "kimi-k2.7-code": {
+      "provider": "opencode-go",
+      "model_id": "kimi-k2.7-code",
+      "max_tokens": 262144,
+      "vision": true
+    },
+    "longcat-2.0": {
+      "provider": "opencode-go",
+      "model_id": "longcat-2.0",
+      "max_tokens": 131072,
+      "vision": false
+    },
+    "longcat-2.5-preview-free": {
+      "provider": "opencode-go",
+      "model_id": "longcat-2.5-preview-free",
+      "max_tokens": 131072,
+      "vision": true
+    },
+    "mimo-v2.5": {
+      "provider": "opencode-go",
+      "model_id": "mimo-v2.5",
+      "max_tokens": 128000,
+      "vision": true
+    },
+    "mimo-v2.5-pro": {
+      "provider": "opencode-go",
+      "model_id": "mimo-v2.5-pro",
+      "max_tokens": 128000,
+      "vision": false
+    },
+    "mimo-v2.6-flash": {
+      "provider": "opencode-go",
+      "model_id": "mimo-v2.6-flash",
+      "max_tokens": 131072,
+      "vision": true
+    },
+    "mimo-v2.6-pro": {
+      "provider": "opencode-go",
+      "model_id": "mimo-v2.6-pro",
+      "max_tokens": 131072,
+      "vision": true
+    },
+    "minimax-m2.7": {
+      "provider": "opencode-go",
+      "model_id": "minimax-m2.7",
+      "max_tokens": 131072,
+      "vision": false,
+      "wire_format": "anthropic"
+    },
+    "muse-spark-1.2-contributor": {
+      "provider": "opencode-go",
+      "model_id": "muse-spark-1.2-contributor",
+      "max_tokens": 131072,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "muse-spark-1.3-contributor": {
+      "provider": "opencode-go",
+      "model_id": "muse-spark-1.3-contributor",
+      "max_tokens": 131072,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "qwen3.7-plus": {
+      "provider": "opencode-go",
+      "model_id": "qwen3.7-plus",
+      "max_tokens": 65536,
+      "vision": true,
+      "wire_format": "anthropic"
+    },
+    "space-bunny": {
+      "provider": "opencode-go",
+      "model_id": "space-bunny",
+      "max_tokens": 524288,
+      "vision": true
+    },
+    "step-5-preview-free": {
+      "provider": "opencode-go",
+      "model_id": "step-5-preview-free",
+      "max_tokens": 65536,
+      "vision": true
+    },
+    "deepseek-v4-flash": {
+      "provider": "opencode-go",
+      "model_id": "deepseek-v4-flash",
+      "max_tokens": 384000,
+      "vision": false
+    },
+    "deepseek-v4-flash-vision-exp": {
+      "provider": "opencode-go",
+      "model_id": "deepseek-v4-flash-vision-exp",
+      "max_tokens": 384000,
+      "vision": true
+    },
+    "grok-4.5": {
+      "provider": "opencode-go",
+      "model_id": "grok-4.5",
+      "max_tokens": 500000,
+      "vision": true,
+      "wire_format": "responses"
+    },
+    "kimi-k2.6": {
+      "provider": "opencode-go",
+      "model_id": "kimi-k2.6",
+      "max_tokens": 65536,
+      "vision": true
+    },
+    "qwen3.6-plus": {
+      "provider": "opencode-go",
+      "model_id": "qwen3.6-plus",
+      "max_tokens": 65536,
+      "vision": true
+    },
+    "qwen3.7-max": {
+      "provider": "opencode-go",
+      "model_id": "qwen3.7-max",
+      "max_tokens": 65536,
+      "vision": false
+    },
+    "space-bunny-free": {
+      "provider": "opencode-go",
+      "model_id": "space-bunny-free",
+      "max_tokens": 524288,
+      "vision": true
+    }
+  },
+  "opencode_go": {
+    "base_url": "https://opencode.ai/inference/go/v1/chat/completions",
+    "anthropic_base_url": "https://opencode.ai/inference/go/v1/messages",
+    "responses_base_url": "https://opencode.ai/inference/go/v1/responses"
+  },
+  "logging": {
+    "level": "warn",
+    "requests": false
+  }
+}

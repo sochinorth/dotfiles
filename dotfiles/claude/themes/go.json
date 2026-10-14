@@ -1,0 +1,11 @@
+{
+  "name": "go",
+  "base": "dark",
+  "overrides": {
+    "claude": "rgb(106,155,204)",
+    "claudeShimmer": "rgb(150,185,227)",
+    "clawd_body": "rgb(106,155,204)",
+    "promptBorder": "rgb(111,139,168)",
+    "promptBorderShimmer": "rgb(146,169,192)"
+  }
+}

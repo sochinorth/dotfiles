@@ -80,6 +80,39 @@ lk() {
 	dir=$(walk --fuzzy "$@") && [[ -n $dir ]] && cd -- "$dir"
 }
 
+# Claude Code on OpenCode Go: ~/.claude.go is ~/.claude (linked) plus settings.go.json
+# (theme, models), talking to Go through routatic-proxy (Go serves GLM, Kimi, DeepSeek
+# only OpenAI-style). routatic runs one server per user (its PID file is fixed), so
+# sessions share it: the first starts it, the last one out (run/ lists them) stops it.
+claude-go() {
+	emulate -L zsh
+	local dir=~/.claude.go key bin port f i
+	local -a left
+	local proxy='http:routatic-proxy[url=https://github.com/routatic/proxy/releases/download/v{{version}}/routatic-proxy_linux-amd64,bin=routatic-proxy]@0.6.5'
+	key=$(<$dir/opencode-go.key) || return
+	port=$(jq -r .port $dir/routatic.json) || return
+	bin=$(mise where $proxy 2>/dev/null) || { mise install -q $proxy && bin=$(mise where $proxy) } || return
+	bin=$bin/routatic-proxy
+	mkdir -p $dir/run && : >$dir/run/$$
+	if ! curl -s -o /dev/null http://127.0.0.1:$port/; then
+		$bin stop >/dev/null 2>&1	# one that isn't answering on our port
+		ROUTATIC_PROXY_API_KEY=$key $bin serve -c $dir/routatic.json >>$dir/routatic.log 2>&1 &!
+		for i in {1..150}; do
+			curl -s -o /dev/null http://127.0.0.1:$port/ && break
+			(( i < 150 )) || { print -u2 "routatic-proxy isn't answering, see $dir/routatic.log"; rm -f $dir/run/$$; return 1 }
+			sleep 0.1
+		done
+	fi
+	{
+		CLAUDE_CONFIG_DIR=$dir ANTHROPIC_BASE_URL=http://127.0.0.1:$port claude --settings $dir/settings.go.json "$@"
+	} always {
+		rm -f $dir/run/$$
+		for f in $dir/run/*(N); do kill -0 ${f:t} 2>/dev/null || rm -f $f; done
+		left=($dir/run/*(N))
+		(( $#left )) || $bin stop >/dev/null 2>&1
+	}
+}
+
 source ~/.config/broot/launcher/bash/br
 # kak(), kakbr() and the broot() opener wrapper (kakmux repo, dotfiles/config/kak)
 [[ -r ~/.config/kak/shell/kakmux.zsh ]] && source ~/.config/kak/shell/kakmux.zsh
