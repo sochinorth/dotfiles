@@ -24,17 +24,13 @@ ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline tom
 # Claude Code's managed settings (what claude and claude-go share; see mise.toml):
 # /etc/claude-code is a link to dotfiles/claude/etc, so editing or adding
 # files there (managed-settings.json, CLAUDE.md, managed-mcp.json) needs no
-# bootstrap. /etc wants root, once: only a missing or wrong link is replaced,
-# and a directory there only if it holds nothing but an old drop-in link.
+# bootstrap. /etc wants root, once: a missing or wrong link is replaced, a real
+# directory there is left alone.
 etc=/etc/claude-code
 src=$(cd -- "$(dirname -- "$0")/.." && pwd)/dotfiles/claude/etc
-old=$etc/managed-settings.d/dotfiles.json
-if [[ $(readlink "$etc" 2>/dev/null) == "$src" ]]; then
-	:
-elif [[ -d $etc && ! -L $etc && -n $(find "$etc" -mindepth 1 ! -path "$etc/managed-settings.d" ! -path "$old") ]]; then
-	echo "warning: $etc has files of its own, so it isn't linked to $src" >&2
-else
-	sudo rm -rf -- "$etc"
+if [[ -d $etc && ! -L $etc ]]; then
+	echo "warning: $etc is a directory, so it isn't linked to $src" >&2
+elif [[ $(readlink "$etc") != "$src" ]]; then
 	sudo ln -sfn "$src" "$etc"
 fi
 
