@@ -13,6 +13,7 @@
     }
   },
   "switchModelsOnFlag": true,
+  "preferredNotifChannel": "ghostty",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
