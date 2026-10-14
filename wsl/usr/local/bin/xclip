@@ -1,7 +1,25 @@
-#!/usr/bin/sh
-
-if [[ $1 == "-o" ]] || [[ -t 0 ]]; then
-	win32yank.exe -o --lf
-elif [[ $1 == "-i" ]]; then
-	win32yank.exe -i --crlf
+#!/bin/sh
+# xclip for WSL: the Windows clipboard through win32yank.exe, text only. Any
+# other target (-t image/png, -t TARGETS) fails, as xclip does when nothing
+# of that type is there, so callers fall back to their own way (Claude Code's
+# image paste then asks PowerShell). Every -selection is the one clipboard.
+out=
+type=
+while [ $# -gt 0 ]; do
+	case $1 in
+		-o | -out) out=1 ;;
+		-i | -in) out= ;;
+		-t | -target) type=$2; shift ;;
+		-selection | -sel | -d | -display | -l | -loops) shift ;;
+	esac
+	shift
+done
+case $type in
+	'' | text/plain* | UTF8_STRING | STRING | TEXT) ;;
+	*) exit 1 ;;
+esac
+# no -o, but nothing piped in either: reading is what was meant
+if [ -n "$out" ] || [ -t 0 ]; then
+	exec win32yank.exe -o --lf
 fi
+exec win32yank.exe -i --crlf
