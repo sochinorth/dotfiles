@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# post-dotfiles hook: state that apps generate on first run but .zshrc expects.
+# post-dotfiles hook: state that apps generate on first run but .zshrc expects,
+# the links Claude Code's config dirs need, and fortune's indexes.
 set -euo pipefail
 
 # .zshrc sources the bash `br` launcher at a fixed path; `broot --install` would
