@@ -84,6 +84,9 @@ lk() {
 # (theme, models), talking to Go through routatic-proxy (Go serves GLM, Kimi, DeepSeek
 # only OpenAI-style). routatic runs one server per user (its PID file is fixed), so
 # sessions share it: the first starts it, the last one out (run/ lists them) stops it.
+# Nothing goes to Anthropic: no telemetry, error reports, feature flags, feedback or
+# other nonessential traffic (no Anthropic account here); set in the environment, not
+# settings.go.json, so they hold from startup, before settings load.
 claude-go() {
 	emulate -L zsh
 	local dir=~/.claude.go key bin port f i
@@ -104,6 +107,9 @@ claude-go() {
 		done
 	fi
 	{
+		CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
+		DISABLE_ERROR_REPORTING=1 DISABLE_GROWTHBOOK=1 CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1 \
+		DISABLE_FEEDBACK_COMMAND=1 DISABLE_BUG_COMMAND=1 \
 		CLAUDE_CONFIG_DIR=$dir ANTHROPIC_BASE_URL=http://127.0.0.1:$port claude --settings $dir/settings.go.json "$@"
 	} always {
 		rm -f $dir/run/$$
