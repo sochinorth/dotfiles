@@ -20,14 +20,21 @@ fi
 # `ktsctl sync <lang>`, names from `ktsctl query -a`.
 ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline toml json yaml
 
-# Claude Code's managed settings (what claude and claude-go share; see mise.toml)
-# are a link into this repo, so editing them needs no bootstrap. /etc wants root,
-# once: only a missing or wrong link (or a file from before) is replaced.
-managed=/etc/claude-code/managed-settings.d/dotfiles.json
-src=$(cd -- "$(dirname -- "$0")/.." && pwd)/dotfiles/claude/managed-settings.json
-if [[ $(readlink "$managed" 2>/dev/null) != "$src" ]]; then
-	sudo install -d -m 755 "${managed%/*}"
-	sudo ln -sfn "$src" "$managed"
+# Claude Code's managed settings (what claude and claude-go share; see mise.toml):
+# /etc/claude-code is a link to dotfiles/claude/etc, so editing or adding
+# files there (managed-settings.json, CLAUDE.md, managed-mcp.json) needs no
+# bootstrap. /etc wants root, once: only a missing or wrong link is replaced,
+# and a directory there only if it holds nothing but an old drop-in link.
+etc=/etc/claude-code
+src=$(cd -- "$(dirname -- "$0")/.." && pwd)/dotfiles/claude/etc
+old=$etc/managed-settings.d/dotfiles.json
+if [[ $(readlink "$etc" 2>/dev/null) == "$src" ]]; then
+	:
+elif [[ -d $etc && ! -L $etc && -n $(find "$etc" -mindepth 1 ! -path "$etc/managed-settings.d" ! -path "$old") ]]; then
+	echo "warning: $etc has files of its own, so it isn't linked to $src" >&2
+else
+	sudo rm -rf -- "$etc"
+	sudo ln -sfn "$src" "$etc"
 fi
 
 # ~/.claude.go (claude-go in .zshrc) is Claude Code on OpenCode Go. It keeps its

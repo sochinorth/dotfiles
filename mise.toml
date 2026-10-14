@@ -175,7 +175,7 @@ mode = "0644"
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
 # Claude Code, in layers: what both claude and claude-go share is managed settings
-# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/managed-settings.json:
+# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/etc:
 # wins over everything, edits apply at Claude Code's next start); each one's own
 # settings.json is Claude Code's to write (/model, /theme, /config), not tracked,
 # only seeded here; claude-go adds settings.go.json on top (--settings).
