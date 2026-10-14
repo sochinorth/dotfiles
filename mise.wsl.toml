@@ -4,24 +4,22 @@
 # Sources live in wsl/. Remove everything this module manages with
 #	mise bootstrap unapply wsl
 
-# The Windows side, under the Windows user's home (wsl/bin/winhome asks
-# Windows where it is; mise can't put a dotfile at a path it has to find out):
-# - .wslconfig, a copy: Windows can't follow a symlink into the WSL filesystem.
-#   Its memory= is 85% of the host's RAM, asked of Windows (~1 s) each time.
-# - the xclip shim is only half of the clipboard: win32yank.exe lives there
+# .wslconfig goes to the Windows user's home, as a copy: Windows can't follow a
+# symlink into the WSL filesystem. One PowerShell call (~1 s) says where that
+# home is and how much RAM the host has (memory= is 85% of it).
 [bootstrap.hooks]
 final = '''
-home=$('{{ config_root }}/wsl/bin/winhome') || exit 1
-ram=$(cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
-	-Command '(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory' | tr -d '\r')
-case $ram in
-''|*[!0-9]*) echo "Windows didn't say how much RAM it has" >&2; exit 1 ;;
-esac
+{ read -r home; read -r ram; } <<EOF
+$(cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
+	-Command '$env:USERPROFILE; (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory' | tr -d '\r')
+EOF
+case $home in ?:\\*) ;; *) home= ;; esac
+case $ram in ''|*[!0-9]*) home= ;; esac
+[ -n "$home" ] || { echo "Windows didn't say where its home is or how much RAM it has (WSL interop off?)" >&2; exit 1; }
+home=$(wslpath -u "$home") || exit 1
 conf=$(awk -v gb=$((ram / 20 * 17 >> 30)) '{ print } /^\[wsl2\]$/ { print "memory=" gb "GB" }' '{{ config_root }}/wsl/wslconfig')
 [ "$conf" = "$(cat "$home/.wslconfig" 2>/dev/null)" ] \
 	|| { printf '%s\n' "$conf" > "$home/.wslconfig" && echo "wrote $home/.wslconfig"; }
-test -x "$home/.local/bin/win32yank.exe" \
-	|| echo "warning: win32yank.exe missing from $home/.local/bin, so xclip will not work (https://github.com/equalsraf/win32yank/releases)"
 '''
 
 # systemd on, default user, hostname, Windows PATH off (wsl/zsh/wsl.zsh adds back only what it needs)
@@ -30,6 +28,11 @@ source = "wsl/etc/wsl.conf"
 owner = "root"
 group = "root"
 mode = "0644"
+
+# win32yank.exe, the xclip shim's other half, in /usr/bin: a Windows exe runs
+# from the WSL filesystem as well as from C:
+[bootstrap.packages]
+"aur:win32yank-bin" = "latest"
 
 # xclip shim -> win32yank.exe, so tools that only know xclip reach the Windows clipboard
 [bootstrap.files."/usr/local/bin/xclip"]
