@@ -77,6 +77,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:git" = "latest"
 "pacman:git-delta" = "latest"
 "pacman:git-filter-repo" = "latest"
+"pacman:github-cli" = "latest"		# gh
 "pacman:gcc" = "latest"
 "pacman:clang" = "latest"
 "pacman:mingw-w64-gcc" = "latest"	# Windows cross-compiler
