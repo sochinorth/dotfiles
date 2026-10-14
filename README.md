@@ -10,7 +10,7 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | `mise.wsl.toml` | WSL module: `wsl.conf`, xclip → win32yank shim, `.wslconfig`, Windows PATH, win32yank check | `wsl/` |
 | `.miserc.local.toml` | Per machine, gitignored: which modules a plain `mise bootstrap` loads | |
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
-| `dotfiles/skills/*` | Agent skills as submodules ([idasql-skills](https://github.com/allthingsida/idasql-skills)) | `post-dotfiles` links each skill into `~/.agents/skills` and `~/.claude/skills` |
+| `dotfiles/claude` | Claude Code, in layers: `managed-settings.json` is what's shared (plugins such as [idasql-skills](https://github.com/allthingsida/idasql-skills), from marketplaces declared there); `settings.json` stays Claude Code's to write (`settings.claude.json` seeds it); themes | mise: managed settings into `/etc/claude-code` (`[bootstrap.files]`), the rest into `~/.claude` (`[dotfiles]`) |
 | `dotfiles/fortune` | fortune cookies fortune-mod doesn't ship: its offensive (`-off`) set, which Arch builds without, and others (sources below) | mise links each into `~/.local/share/fortune`; `post-dotfiles` runs `strfile` |
 | `README.local.md` | Per machine, gitignored: notes about this machine (what isn't captured, where) | |
 
@@ -46,12 +46,11 @@ mise trust && mise -E wsl bootstrap --dry-run && mise -E wsl bootstrap   # drop 
 
 Then copy `~/.ssh/id_ed25519_*` over by hand (keys are deliberately not in the repo). Hosts that only matter on one machine go in `~/.ssh/config.local`, which `~/.ssh/config` includes.
 
-The Kakoune config (`dotfiles/config/kak`) and the agent skills
-(`dotfiles/skills/*`) are submodules, cloned over HTTPS (no keys needed yet). A
-clone made without `--recurse-submodules` gets them from the `pre-dotfiles`
-hook; by hand, `git submodule update --init`. After pulling a commit that moves
-one, `git submodule update` (that checks out the recorded commit: commit and
-push work in the submodule first).
+The Kakoune config (`dotfiles/config/kak`) is a submodule, cloned over HTTPS
+(no keys needed yet). A clone made without `--recurse-submodules` gets it from
+the `pre-dotfiles` hook; by hand, `git submodule update --init`. After pulling a
+commit that moves it, `git submodule update` (that checks out the recorded
+commit: commit and push work in the submodule first).
 
 ## Order of operations, and why
 

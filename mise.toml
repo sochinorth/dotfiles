@@ -12,10 +12,9 @@
 [bootstrap.hooks]
 # Repos, keys and fudo-git must exist before mise installs packages with `sudo`.
 pre-packages = "bash '{{ config_root }}/scripts/pre-packages.sh'"
-# Submodules (the Kakoune config, dotfiles/config/kak, is the kakmux repo;
-# agent skills in dotfiles/skills): checked out here when the clone was made
-# without --recurse-submodules. One already checked out is left alone (it's
-# the live config, maybe ahead).
+# The submodule (the Kakoune config, dotfiles/config/kak, is the kakmux repo):
+# checked out here when the clone was made without --recurse-submodules. One
+# already checked out is left alone (it's the live config, maybe ahead).
 pre-dotfiles = """
 cd '{{ config_root }}' || exit
 if git submodule status | grep -q '^-'; then git submodule update --init; fi
@@ -145,6 +144,25 @@ owner = "root"
 group = "root"
 mode = "0644"
 
+# Claude Code's managed settings: what every instance shares (plugins and their
+# marketplaces; those are honored only from here once it exists). Files
+# don't get their parent directories made, so those are declared too.
+[bootstrap.directories."/etc/claude-code"]
+owner = "root"
+group = "root"
+mode = "0755"
+
+[bootstrap.directories."/etc/claude-code/managed-settings.d"]
+owner = "root"
+group = "root"
+mode = "0755"
+
+[bootstrap.files."/etc/claude-code/managed-settings.d/dotfiles.json"]
+source = "dotfiles/claude/managed-settings.json"
+owner = "root"
+group = "root"
+mode = "0644"
+
 # --- dotfiles ----------------------------------------------------------------
 # Edited-in-place configs are symlinks into this repo. Configs that their app
 # rewrites are copies. Everything Kakoune (kak, kakbr, kakmux, broot-open) is
@@ -175,6 +193,13 @@ mode = "0644"
 "~/.local/lib/broot-opener/xdg-open" = { source = "dotfiles/config/kak/scripts/broot-open", mode = "symlink" }
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
+# Claude Code, in layers: what's shared is managed settings (/etc/claude-code,
+# above: read-only, wins over everything); settings.json is Claude Code's to
+# write (/model, /theme, /config), not tracked, only seeded here.
+# ~/.claude.json is app state, not tracked.
+"~/.claude/settings.json/defaults" = { source = "dotfiles/claude/settings.claude.json", merge = "missing" }
+# stock claude's theme: dark with an orange-tinted prompt border
+"~/.claude/themes/claude.json" = { source = "dotfiles/claude/themes/claude.json", mode = "symlink" }
 "~/.config/btop/btop.conf" = { source = "dotfiles/config/btop/btop.conf", mode = "copy" }
 # fortune cookies beyond fortune-mod's; post-dotfiles indexes them, .zshrc reads them
 "~/.local/share/fortune/*" = { source = "dotfiles/fortune/*", mode = "symlink" }
