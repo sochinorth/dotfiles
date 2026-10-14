@@ -65,7 +65,7 @@ That dependency chain fixes the order:
    - installs `paru` (prebuilt, cachyos repo), removes real sudo only after `doas true` succeeds, then `paru` installs fudo-git
 3. `[bootstrap.packages]`: pacman, now through sudo → fudo → doas; `aur:` entries through paru, which uses the stock `/etc/paru.conf` and elevates through sudo → fudo → doas too. Don't create an empty `~/.config/paru/paru.conf`: any user file replaces `/etc/paru.conf` and loses its defaults.
 4. `[bootstrap.files]`: `/etc` configs; with WSL, also the `/usr/local/bin/xclip` → `win32yank.exe` shim.
-5. The `pre-dotfiles` hook (checks out the submodules if the clone lacks them), `[dotfiles]`, then the `post-dotfiles` hook (broot `br` launcher, tealdeer cache, kak-tree-sitter grammars, agent skill links).
+5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hook (broot `br` launcher, tealdeer cache, kak-tree-sitter grammars, `~/.claude` linked into `~/.claude.go`, fortune indexes).
 6. Login shell → zsh; with WSL, the `final` hook warns if `win32yank.exe` is missing on the Windows side.
 
 ## Gotchas captured here
