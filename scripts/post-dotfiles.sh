@@ -20,6 +20,16 @@ fi
 # `ktsctl sync <lang>`, names from `ktsctl query -a`.
 ktsctl sync c cpp rust rust-format-args python bash markdown markdown.inline toml json yaml
 
+# Claude Code's managed settings (what claude and claude-go share; see mise.toml)
+# are a link into this repo, so editing them needs no bootstrap. /etc wants root,
+# once: only a missing or wrong link (or a file from before) is replaced.
+managed=/etc/claude-code/managed-settings.d/dotfiles.json
+src=$(cd -- "$(dirname -- "$0")/.." && pwd)/dotfiles/claude/managed-settings.json
+if [[ $(readlink "$managed" 2>/dev/null) != "$src" ]]; then
+	sudo install -d -m 755 "${managed%/*}"
+	sudo ln -sfn "$src" "$managed"
+fi
+
 # ~/.claude.go (claude-go in .zshrc) is Claude Code on OpenCode Go. It keeps its
 # own credentials, app state (.claude.json), settings.json (what /model, /theme
 # and /config save; the shared settings are managed ones) and what mise links in

@@ -144,25 +144,6 @@ owner = "root"
 group = "root"
 mode = "0644"
 
-# Claude Code's managed settings: what claude and claude-go share (plugins and
-# their marketplaces; those are honored only from here once it exists). Files
-# don't get their parent directories made, so those are declared too.
-[bootstrap.directories."/etc/claude-code"]
-owner = "root"
-group = "root"
-mode = "0755"
-
-[bootstrap.directories."/etc/claude-code/managed-settings.d"]
-owner = "root"
-group = "root"
-mode = "0755"
-
-[bootstrap.files."/etc/claude-code/managed-settings.d/dotfiles.json"]
-source = "dotfiles/claude/managed-settings.json"
-owner = "root"
-group = "root"
-mode = "0644"
-
 # --- dotfiles ----------------------------------------------------------------
 # Edited-in-place configs are symlinks into this repo. Configs that their app
 # rewrites are copies. Everything Kakoune (kak, kakbr, kakmux, broot-open) is
@@ -194,7 +175,8 @@ mode = "0644"
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
 # Claude Code, in layers: what both claude and claude-go share is managed settings
-# (/etc/claude-code, above: read-only, wins over everything); each one's own
+# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/managed-settings.json:
+# wins over everything, edits apply at Claude Code's next start); each one's own
 # settings.json is Claude Code's to write (/model, /theme, /config), not tracked,
 # only seeded here; claude-go adds settings.go.json on top (--settings).
 # ~/.claude.json is app state, not tracked.
