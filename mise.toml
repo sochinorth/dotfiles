@@ -181,6 +181,8 @@ mode = "0644"
 # only seeded here; claude-go adds settings.go.json on top (--settings).
 # ~/.claude.json is app state, not tracked.
 "~/.claude/settings.json/defaults" = { source = "dotfiles/claude/settings.claude.json", merge = "missing" }
+# the status line both run (managed-settings.json): which one, model, dir @ branch, context, limits
+"~/.claude/statusline.sh" = { source = "dotfiles/claude/statusline.sh", mode = "symlink" }
 # stock claude's theme: dark with an orange-tinted prompt border (go.json tints it blue)
 "~/.claude/themes/claude.json" = { source = "dotfiles/claude/themes/claude.json", mode = "symlink" }
 # ~/.claude.go (claude-go in .zshrc): Claude Code on OpenCode Go. post-dotfiles links

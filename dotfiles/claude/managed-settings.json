@@ -12,5 +12,9 @@
       "autoUpdate": true
     }
   },
-  "switchModelsOnFlag": true
+  "switchModelsOnFlag": true,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  }
 }
