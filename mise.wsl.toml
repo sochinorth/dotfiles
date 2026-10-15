@@ -41,5 +41,25 @@ owner = "root"
 group = "root"
 mode = "0755"
 
+# The image masks the stock /tmp cleaner (with the tmpfiles setup units) for
+# WSLg's /tmp/.X11-unix mount. wslg.conf exempts that mount from cleaning, so
+# the cleaner comes back, WSLg or not; the setup units stay masked.
+[bootstrap.files."/etc/tmpfiles.d/wslg.conf"]
+source = "wsl/etc/tmpfiles.d/wslg.conf"
+owner = "root"
+group = "root"
+mode = "0644"
+
+# Both units are static (timers.target pulls the timer in from /usr/lib), so
+# there's nothing to enable; starting the timer saves waiting for a restart.
+[bootstrap.services."systemd-tmpfiles-clean.service"]
+masked = false
+state = "stopped"
+enabled = false
+
+[bootstrap.services."systemd-tmpfiles-clean.timer"]
+state = "running"
+enabled = false
+
 [dotfiles]
 "~/.config/zsh/conf.d/wsl.zsh" = { source = "wsl/zsh/wsl.zsh", mode = "symlink" }

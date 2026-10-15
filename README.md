@@ -7,7 +7,7 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | File | What it is | Sources |
 | --- | --- | --- |
 | `mise.toml` | Generic: repos, doas/fudo, packages, `/etc` basics, dotfiles | `files/`, `dotfiles/`, `scripts/` |
-| `mise.wsl.toml` | WSL module: `wsl.conf`, xclip → win32yank shim, `.wslconfig`, Windows PATH, win32yank (AUR) | `wsl/` |
+| `mise.wsl.toml` | WSL module: `wsl.conf`, xclip → win32yank shim, the stock /tmp cleaner unmasked (WSLg's X socket exempt), `.wslconfig`, Windows PATH, win32yank (AUR) | `wsl/` |
 | `.miserc.local.toml` | Per machine, gitignored: which modules a plain `mise bootstrap` loads | |
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
 | `dotfiles/claude` | Claude Code, in layers: `etc/managed-settings.json` is what `claude` and `claude-go` share (plugins such as [idasql-skills](https://github.com/allthingsida/idasql-skills), from marketplaces declared there); each one's `settings.json` stays Claude Code's to write (`settings.claude.json` seeds it); `claude-go` (Claude Code on OpenCode Go through routatic-proxy) adds `settings.go.json`, and `go-models.py` regenerates its model list; themes, and `shimmer.py` to derive a theme's shimmer colour from its accent | mise: into `~/.claude` and `~/.claude.go` (`[dotfiles]`); `post-dotfiles` links `/etc/claude-code` to `etc/` and the rest of `~/.claude` into `~/.claude.go` |
