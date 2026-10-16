@@ -1,7 +1,10 @@
 [wsl2]
-networkingMode=Consomme
+networkingMode=Mirrored
 autoProxy=false
 dnsProxy=false
 guiApplications=false
+dnsTunneling=false
 
 [experimental]
+
+hostAddressLoopback=true
