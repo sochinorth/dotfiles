@@ -6,13 +6,65 @@
 
 # .wslconfig goes to the Windows user's home, as a copy: Windows can't follow a
 # symlink into the WSL filesystem. One PowerShell call (~1 s) says where that
-# home is and how much RAM the host has (memory= is 85% of it).
+# home is, how much RAM the host has (memory= is 85% of it), and whether
+# dumpcap.exe is running.
+#
+# Mirrored loopback between Windows and WSL is broken (microsoft/WSL#40343)
+# unless something holds Npcap's \Device\NPF_Loopback open. The Windows half of
+# this module is a SYSTEM boot task (wsl/npcap-loopback.xml) running dumpcap.exe
+# on it with a capture filter nothing matches. Its default ACL hides the task
+# from non-admins, so a running dumpcap.exe stands in for "installed"; without
+# one, the task is (re)registered and started from an elevated PowerShell (UAC
+# prompt). Needs Wireshark with Npcap's loopback support; without dumpcap.exe
+# the hook explains the problem and offers to install it. Remove the task with
+#	schtasks /delete /tn "Npcap loopback keepalive" /f   (elevated)
 [bootstrap.hooks]
 final = '''
-{ read -r home; read -r ram; } <<EOF
-$(cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
-	-Command '$env:USERPROFILE; (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory' | tr -d '\r')
+ps=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+{ read -r home; read -r ram; read -r dumpcap; } <<EOF
+$(cd /mnt/c && $ps -NoProfile -NonInteractive </dev/null -Command '$env:USERPROFILE
+(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+if (Get-Process dumpcap -EA 0) { "running" } elseif (Test-Path "$env:ProgramFiles\Wireshark\dumpcap.exe") { "stopped" } else { "missing" }' | tr -d '\r')
 EOF
+if [ "$dumpcap" = missing ]; then
+	cat >&2 <<'MSG'
+
+  !! Windows <-> WSL loopback is BROKEN under mirrored networking (microsoft/WSL#40343).
+  !! localhost connections across the boundary hang or get refused, unless something
+  !! holds Npcap's \Device\NPF_Loopback open. This module keeps dumpcap.exe on it from a
+  !! boot task, but Windows has no dumpcap.exe: Wireshark (with Npcap) isn't installed.
+
+MSG
+	# Npcap's free edition has no silent install, so winget runs Wireshark's
+	# installer interactively: tick Npcap, and in Npcap's, loopback support.
+	# A failed exec redirection would kill the hook, so probe the tty first.
+	if [ -t 0 ] || { (exec </dev/tty) 2>/dev/null && exec </dev/tty; }; then
+		printf 'Install Wireshark now (winget, interactive: tick Npcap + "Support loopback traffic")? [y/N] ' >&2
+		read -r ans
+		case $ans in [yY]*)
+			(cd /mnt/c && $ps -NoProfile -NonInteractive -Command \
+				'winget install -e --id WiresharkFoundation.Wireshark -i --accept-source-agreements --accept-package-agreements')
+			[ -e '/mnt/c/Program Files/Wireshark/dumpcap.exe' ] && dumpcap=stopped ;;
+		esac
+	fi
+	[ "$dumpcap" = missing ] && echo "skipping the loopback keepalive; install Wireshark and rerun the bootstrap" >&2
+fi
+if [ "$dumpcap" = stopped ]; then
+	# The XML goes in as a here-string inside -EncodedCommand, so the elevated
+	# process needs no path into the WSL filesystem.
+	# gsudo hands back the exit status; Start-Process -Verb RunAs only says
+	# whether UAC let it start.
+	cmd=$(printf "\$ProgressPreference = 'SilentlyContinue'\nRegister-ScheduledTask -TaskName 'Npcap loopback keepalive' -Force -Xml @'\n%s\n'@ | Start-ScheduledTask" \
+		"$(cat '{{ config_root }}/wsl/npcap-loopback.xml')" | iconv -t UTF-16LE | base64 -w0)
+	gsudo='/mnt/c/Program Files/gsudo/Current/gsudo.exe'
+	(cd /mnt/c && if [ -x "$gsudo" ]; then
+		"$gsudo" powershell.exe -NoProfile -NonInteractive -EncodedCommand "$cmd"
+	else
+		$ps -NoProfile -NonInteractive -Command \
+			"Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','$cmd'"
+	fi) && echo "registered the Npcap loopback keepalive task" \
+		|| echo "couldn't register the Npcap loopback keepalive task (UAC declined?)" >&2
+fi
 case $home in ?:\\*) ;; *) home= ;; esac
 case $ram in ''|*[!0-9]*) home= ;; esac
 [ -n "$home" ] || { echo "Windows didn't say where its home is or how much RAM it has (WSL interop off?)" >&2; exit 1; }
