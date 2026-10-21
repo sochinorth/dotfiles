@@ -12,6 +12,13 @@
       "autoUpdate": true
     }
   },
+  "autoMemoryEnabled": false,
+  "env": {
+    "CLAUDE_CODE_DISABLE_CRON": "1"
+  },
+  "permissions": {
+    "deny": ["ScheduleWakeup"]
+  },
   "switchModelsOnFlag": true,
   "preferredNotifChannel": "ghostty",
   "statusLine": {
