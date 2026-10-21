@@ -7,19 +7,27 @@ clamps each request's max_tokens to that limit) and settings.go.json's "modelPic
 
 	python3 dotfiles/claude/go-models.py
 
-Deprecated models (by models.dev) come last, marked so. Left out: Gemini (routatic
-sends Go's session header only on its opencode-go path, which won't speak Gemini).
+Only KEEP's models, in its order; one models.dev no longer lists is skipped. Picked
+2026-10-21 by Artificial Analysis' Intelligence Index, Go's requests per 5 hours and
+cache-read price (claude-go re-reads its context every turn); left out: MiniMax-M3
+(29), Kimi K3, Qwen3.8 Max and Grok 4.7 (110-170 requests per 5h for the same score),
+Muse Spark Contributor (Meta trains on what you send), Gemini (routatic sends Go's
+session header only on its opencode-go path, which won't speak Gemini).
 """
 import json, os, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT = 'glm-5.3'
-# first in the picker, in this order; the rest follow alphabetically
-FIRST = ['glm-5.3', 'minimax-m3', 'qwen3.8-max', 'kimi-k3', 'deepseek-v4-pro', 'qwen3.8-flash']
+DEFAULT = 'deepseek-v4.1-flash'
+# index · req/5h · cache read $/M: 45 · 34,670 · 0.003, 206 tok/s
+KEEP = ['deepseek-v4.1-flash',
+	'mimo-v2.6-pro',            # 46 · 3,250 · 0.0036, but 49 tok/s
+	'glm-5.3',                  # 45 · 220 · 0.26
+	'claude-haiku-5-5',         # 43 · 3,850 · 0.01, 236 tok/s, Anthropic's own wire
+	'minimax-m3.1-flash-free',  # 43 · free for a limited time
+]
 # behavesAs: which Claude model's client-side handling (prompt profile, effort and
 # output defaults) a model gets; haiku for small/fast ones, sonnet for the rest
-OPUS = {'glm-5.3', 'kimi-k3', 'gpt-6-luna', 'grok-4.7', 'deepseek-v4-pro', 'qwen3.8-max',
-	'mimo-v2.6-pro', 'muse-spark-1.3-contributor'}
+OPUS = {'deepseek-v4.1-flash', 'mimo-v2.6-pro', 'glm-5.3'}
 HAIKU_HINTS = ('flash', 'free')
 # routatic's wire format by the AI SDK package models.dev names for the model
 WIRE = {'@ai-sdk/anthropic': 'anthropic', '@ai-sdk/openai': 'responses', None: None}
@@ -40,8 +48,7 @@ def main():
 			continue
 		models[m['id']] = m
 	old = lambda i: models[i].get('status') == 'deprecated'
-	order = [i for i in FIRST if i in models] + sorted(i for i in models if i not in FIRST and not old(i)) \
-		+ sorted(i for i in models if i not in FIRST and old(i))
+	order = [i for i in KEEP if i in models]
 
 	routes, rows = {}, []
 	for i in order:
