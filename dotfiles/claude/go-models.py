@@ -11,8 +11,11 @@ Only KEEP's models, in its order; one models.dev no longer lists is skipped. Pic
 2026-10-21 by Artificial Analysis' Intelligence Index, Go's requests per 5 hours and
 cache-read price (claude-go re-reads its context every turn); left out: MiniMax-M3
 (29), Kimi K3, Qwen3.8 Max and Grok 4.7 (110-170 requests per 5h for the same score),
-Muse Spark Contributor (Meta trains on what you send), Gemini (routatic sends Go's
-session header only on its opencode-go path, which won't speak Gemini).
+Gemini (routatic sends Go's session header only on its opencode-go path, which won't
+speak Gemini), Claude Haiku 5.5 (Go serves it only on the anthropic wire, where
+routatic 0.6.5 adds budget_tokens to adaptive thinking and Go refuses the request).
+Muse Spark Contributor answers only once the Go workspace's Privacy settings allow
+paid endpoints that train on request data.
 """
 import json, os, urllib.request
 
@@ -20,14 +23,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT = 'deepseek-v4.1-flash'
 # index · req/5h · cache read $/M: 45 · 34,670 · 0.003, 206 tok/s
 KEEP = ['deepseek-v4.1-flash',
+	'muse-spark-1.3-contributor',  # 48 · 45,300 · 0.002; Meta trains on what it's sent
 	'mimo-v2.6-pro',            # 46 · 3,250 · 0.0036, but 49 tok/s
 	'glm-5.3',                  # 45 · 220 · 0.26
-	'claude-haiku-5-5',         # 43 · 3,850 · 0.01, 236 tok/s, Anthropic's own wire
+	'glm-5.3-flash',            # 42 · 6,320 · 0.03
 	'minimax-m3.1-flash-free',  # 43 · free for a limited time
 ]
 # behavesAs: which Claude model's client-side handling (prompt profile, effort and
 # output defaults) a model gets; haiku for small/fast ones, sonnet for the rest
-OPUS = {'deepseek-v4.1-flash', 'mimo-v2.6-pro', 'glm-5.3'}
+OPUS = {'deepseek-v4.1-flash', 'muse-spark-1.3-contributor', 'mimo-v2.6-pro', 'glm-5.3'}
 HAIKU_HINTS = ('flash', 'free')
 # routatic's wire format by the AI SDK package models.dev names for the model
 WIRE = {'@ai-sdk/anthropic': 'anthropic', '@ai-sdk/openai': 'responses', None: None}

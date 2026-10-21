@@ -5,7 +5,7 @@
     "ANTHROPIC_MODEL": "deepseek-v4.1-flash[1m]",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "mimo-v2.6-pro[1m]",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4.1-flash[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4.1-flash[1m]",
     "CLAUDE_CODE_AUTO_MODE_MODEL": "deepseek-v4.1-flash[1m]",
     "ENABLE_TOOL_SEARCH": "false",
     "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
@@ -27,6 +27,12 @@
         "behavesAs": "claude-opus-5-5"
       },
       {
+        "model": "muse-spark-1.3-contributor[1m]",
+        "label": "Muse Spark 1.3 Contributor",
+        "description": "1.05M context, 131k output · responses",
+        "behavesAs": "claude-opus-5-5"
+      },
+      {
         "model": "mimo-v2.6-pro[1m]",
         "label": "MiMo-V2.6-Pro",
         "description": "1.05M context, 131k output · chat",
@@ -39,9 +45,10 @@
         "behavesAs": "claude-opus-5-5"
       },
       {
-        "model": "claude-haiku-5-5[1m]",
-        "label": "Claude Haiku 5.5",
-        "description": "1M context, 128k output · anthropic"
+        "model": "glm-5.3-flash[1m]",
+        "label": "GLM-5.3-Flash",
+        "description": "1M context, 131k output · chat",
+        "behavesAs": "claude-haiku-5-5"
       },
       {
         "model": "minimax-m3.1-flash-free[1m]",
