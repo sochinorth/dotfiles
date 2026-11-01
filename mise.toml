@@ -2,7 +2,7 @@
 # with fudo standing in for sudo; the shell, CLI and editor I want on any machine,
 # server or router included. Modules layer on top:
 #	mise bootstrap				# this file only (+ whatever .miserc.local.toml selects)
-#	mise -E dev bootstrap		# + mise.dev.toml: toolchains, debuggers, Claude Code
+#	mise -E dev bootstrap		# + mise.dev.toml: toolchains, debuggers, coding agents
 #	mise -E wsl bootstrap		# + mise.wsl.toml
 #	mise -E dev,wsl bootstrap	# both
 #

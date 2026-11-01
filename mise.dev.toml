@@ -1,6 +1,6 @@
 # Dev module, layered on top of mise.toml: toolchains, debuggers, language
-# tooling for Kakoune, coding agents (Claude Code, OpenCode, pi), and SSH in
-# (dropbear, as a user service).
+# tooling for Kakoune, coding agents (OpenCode, pi; Claude Code as a runtime),
+# and SSH in (dropbear, as a user service).
 #	mise -E dev bootstrap
 # (.miserc.local.toml can select it by default on a dev machine.) Remove
 # everything this module manages with
@@ -29,10 +29,12 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.dev.sh'"
 "pacman:bun" = "latest"			# also runs pi, a bun global (post-dotfiles hook)
 "pacman:python-pip" = "latest"
 
-# AI tools (cachyos repo); bubblewrap is Claude Code's Bash sandbox
-"pacman:claude-code" = "latest"
-"pacman:bubblewrap" = "latest"
+# AI tools (cachyos repo). Claude Code is only a runtime: OpenCode's Claude
+# Agent provider runs it, with OpenCode's tools and none of Claude Code's
+# settings files, so there's no config for it here.
 "pacman:opencode" = "latest"		# update with pacman, not `opencode upgrade`
+"pacman:claude-code" = "latest"
+"pacman:bubblewrap" = "latest"		# sandboxing
 
 # SSH into this box without root: dropbear as a user service (below)
 "pacman:dropbear" = "latest"
@@ -50,25 +52,6 @@ exec_start = "/usr/bin/dropbear -F -E -s -p 22222 -r %h/.config/dropbear/hostkey
 restart = "on-failure"
 
 [dotfiles]
-# Claude Code, in layers: what both claude and claude-go share is managed settings
-# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/etc:
-# wins over everything, edits apply at Claude Code's next start); each one's own
-# settings.json is Claude Code's to write (/model, /theme, /config), not tracked,
-# only seeded here; claude-go adds settings.go.json on top (--settings).
-# ~/.claude.json is app state, not tracked.
-"~/.claude/settings.json/defaults" = { source = "dotfiles/claude/settings.claude.json", merge = "missing" }
-# the status line both run (managed-settings.json): which one, model, dir @ branch, context, limits
-"~/.claude/statusline.sh" = { source = "dotfiles/claude/statusline.sh", mode = "symlink" }
-# stock claude's theme: dark with an orange-tinted prompt border (go.json tints it blue)
-"~/.claude/themes/claude.json" = { source = "dotfiles/claude/themes/claude.json", mode = "symlink" }
-# ~/.claude.go (claude-go in .zshrc): Claude Code on OpenCode Go. post-dotfiles links
-# the rest of ~/.claude into it; only the theme and the upstream differ (settings.go.json)
-"~/.claude/themes/go.json" = { source = "dotfiles/claude/themes/go.json", mode = "symlink" }
-"~/.claude.go/settings.go.json" = { source = "dotfiles/claude/settings.go.json", mode = "symlink" }
-# the proxy claude-go runs alongside (Anthropic -> OpenAI for GLM & co.); it keeps catalog/ next to this path
-"~/.claude.go/routatic.json" = { source = "dotfiles/claude/routatic.go.json", mode = "symlink" }
-# onboarding counts as done there (machineID is random per config dir, not checked); Claude Code owns the other keys
-"~/.claude.go/.claude.json/onboarding" = { source = "dotfiles/claude/claude.go.json", merge = true }
 # OpenCode: the global config and the codex-sale plugin (codex.sale's models,
 # listed live) are edited in place. cli.json is the TUI's to write (theme,
 # settings), only seeded. Credentials, sessions and model picks live in its

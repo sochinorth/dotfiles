@@ -1,8 +1,0 @@
-{
-  "name": "claude",
-  "base": "dark",
-  "overrides": {
-    "promptBorder": "rgb(177,120,101)",
-    "promptBorderShimmer": "rgb(201,154,138)"
-  }
-}

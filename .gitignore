@@ -2,6 +2,3 @@
 mise.local.toml
 mise.*.local.toml
 README.local.md
-# routatic-proxy writes its models.dev cache next to its config, which once
-# meant here (it uses ~/.claude.go/catalog now)
-dotfiles/claude/catalog/
