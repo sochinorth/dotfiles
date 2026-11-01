@@ -28,6 +28,7 @@ post-dotfiles = "bash '{{ config_root }}/dev/post-dotfiles.sh'"
 "pacman:lldb" = "latest"
 "pacman:bun" = "latest"			# also runs pi, a bun global (post-dotfiles hook)
 "pacman:python-pip" = "latest"
+"pacman:bubblewrap" = "latest"		# bwrap: unprivileged namespace sandboxes, run by hand
 
 # AI tools (cachyos repo). Claude Code is only a runtime: OpenCode's Claude
 # Agent provider runs it, with OpenCode's tools and none of Claude Code's
