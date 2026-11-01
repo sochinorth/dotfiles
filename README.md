@@ -7,11 +7,11 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | File | What it is | Sources |
 | --- | --- | --- |
 | `mise.toml` | Generic, for any machine (servers, routers too): repos, doas/fudo, shell, CLI, Kakoune, `/etc` basics, dotfiles | `files/`, `dotfiles/`, `scripts/` |
-| `mise.dev.toml` | Dev module: toolchains (clang, cmake, mingw-w64, bun, pip), debuggers, gh, direnv, just, kakoune-lsp + kak-tree-sitter; coding agents: OpenCode and pi with their config, Claude Code as a runtime for OpenCode (no config); dropbear on :22222 as a user unit (SSH in without root) | `dotfiles/opencode/`, `dotfiles/ssh/authorized_keys`, `scripts/post-dotfiles.dev.sh` |
+| `mise.dev.toml` | Dev module: toolchains (clang, cmake, mingw-w64, bun, pip), debuggers, gh, direnv, just, kakoune-lsp + kak-tree-sitter; coding agents: OpenCode and pi with their config, Claude Code as a runtime for OpenCode (no config); dropbear on :22222 as a user unit (SSH in without root) | `dev/` |
 | `mise.wsl.toml` | WSL module: `wsl.conf`, xclip → win32yank shim, the stock /tmp cleaner unmasked (WSLg's X socket exempt), `.wslconfig`, Windows PATH, win32yank (AUR), the Npcap loopback keepalive (a Windows scheduled task, for mirrored loopback) | `wsl/` |
 | `.miserc.local.toml` | Per machine, gitignored: which modules a plain `mise bootstrap` loads | |
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
-| `dotfiles/opencode` | OpenCode (v2): the global `opencode.json`, `cli.json` (the TUI's: theme), and `plugins/codex-sale`, which defines the codex.sale provider and lists its models live from its `/v1/models`, with capabilities and limits from OpenCode's catalog | mise links `opencode.json` and the plugin into `~/.config/opencode`, seeds `cli.json` |
+| `dev/opencode` | OpenCode (v2): the global `opencode.json`, `cli.json` (the TUI's: theme), and `plugins/codex-sale`, which defines the codex.sale provider and lists its models live from its `/v1/models`, with capabilities and limits from OpenCode's catalog | mise links `opencode.json` and the plugin into `~/.config/opencode`, seeds `cli.json` |
 | `dotfiles/fortune` | fortune cookies fortune-mod doesn't ship: its offensive (`-off`) set, which Arch builds without, and others (sources below) | mise links each into `~/.local/share/fortune`; `post-dotfiles` runs `strfile` |
 | `README.local.md` | Per machine, gitignored: notes about this machine (what isn't captured, where) | |
 
@@ -24,8 +24,10 @@ mise bootstrap unapply wsl     # remove what the WSL module manages
 mise bootstrap unapply dev     # turn a dev box back into a generic one
 ```
 
-Platform tweaks that belong in `.zshrc` go in `~/.config/zsh/conf.d/*.zsh`, which
-`.zshrc` sources. A module deploys its own drop-in (WSL: `wsl/zsh/wsl.zsh`).
+Each module keeps what it brings in its own directory (`wsl/`, `dev/`), so `dotfiles/`,
+`files/` and `scripts/` are only the generic part's. What a module adds to `.zshrc` goes in
+`~/.config/zsh/conf.d/*.zsh`, which `.zshrc` sources: each deploys its own drop-in
+(`wsl/zsh/wsl.zsh`: Windows PATH; `dev/zsh/dev.zsh`: bun's globals, pi).
 
 **Adding another platform** (e.g. bare metal): create `mise.baremetal.toml` with
 its sources in `baremetal/`, and select it with `-E baremetal` or in that machine's
@@ -70,7 +72,7 @@ That dependency chain fixes the order:
    - installs `paru` (prebuilt, cachyos repo), removes real sudo only after `doas true` succeeds, then `paru` installs fudo-git
 3. `[bootstrap.packages]`: pacman, now through sudo → fudo → doas; `aur:` entries through paru, which uses the stock `/etc/paru.conf` and elevates through sudo → fudo → doas too. Don't create an empty `~/.config/paru/paru.conf`: any user file replaces `/etc/paru.conf` and loses its defaults.
 4. `[bootstrap.files]`: `/etc` configs; with WSL, also the `/usr/local/bin/xclip` → `win32yank.exe` shim.
-5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hooks: `scripts/post-dotfiles.sh` (broot `br` launcher, tealdeer cache, fortune indexes), then with dev `scripts/post-dotfiles.dev.sh` (kak-tree-sitter grammars, pi and its shims, linger for the dropbear unit). Hooks from each file add up; a module's hook doesn't replace the generic one.
+5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hooks: `scripts/post-dotfiles.sh` (broot `br` launcher, tealdeer cache, fortune indexes), then with dev `dev/post-dotfiles.sh` (pi and its shims, linger for the dropbear unit, kak-tree-sitter grammars). Hooks from each file add up; a module's hook doesn't replace the generic one.
 6. With dev, the dropbear user unit (`dev.mise.dropbear.service`, enabled and started); then login shell → zsh; with WSL, the `final` hook writes `.wslconfig` on the Windows side.
 
 ## Gotchas captured here
@@ -86,8 +88,8 @@ That dependency chain fixes the order:
 - kak-tree-sitter turns off Kakoune's own highlighting for every language it knows, grammar installed or not. So kakrc writes `~/.config/kak-tree-sitter/config.toml` (not tracked; regenerated when the installed set changes) to hand every language without a grammar back to Kakoune. The dev module's post-dotfiles hook installs a handful (C/C++, Rust, Python, Bash, Markdown, TOML, JSON, YAML); add more with `ktsctl sync <lang>`.
 - Claude Code is only a runtime: OpenCode's Claude Agent provider starts `claude` with `--setting-sources=` (no settings files), `--tools=` (OpenCode's tools over MCP instead), and hooks, CLAUDE.md and auto memory off. Only managed settings (`/etc/claude-code`) would still reach it, so there are none.
 - OpenCode runs as a background service that caches a plugin's module by path: after editing `plugins/codex-sale`, run `opencode service restart` (a config reload re-runs the old code). Its credentials, sessions and model picks are in its database, `~/.local/share/opencode`. It's the pacman package, so update it with pacman, not `opencode upgrade`.
-- pi (`@earendil-works/pi-coding-agent`, a bun global) runs `node`/`npm`/`npx`, and there's no Node here: `~/.local/pi-shims` holds bun under those names, and `.zshrc`'s `pi` alias puts it first on PATH for pi alone.
-- Dropbear (dev) serves only you, since it runs as you, and keys only: the ones in `dotfiles/ssh/authorized_keys`, copied (not linked) to `~/.ssh/authorized_keys`. Its host key is generated on the unit's first start in `~/.config/dropbear/`, so a new machine has a new one.
+- pi (`@earendil-works/pi-coding-agent`, a bun global) runs `node`/`npm`/`npx`, and there's no Node here: `~/.local/pi-shims` holds bun under those names, and the `pi` alias (`dev/zsh/dev.zsh`) puts it first on PATH for pi alone.
+- Dropbear (dev) serves only you, since it runs as you, and keys only: the ones in `dev/ssh/authorized_keys`, copied (not linked) to `~/.ssh/authorized_keys`. Its host key is generated on the unit's first start in `~/.config/dropbear/`, so a new machine has a new one.
 - Not captured: secrets (SSH keys, app credentials), project checkouts, timezone/hostname files that WSL generates. What that means on a given machine goes in its `README.local.md`.
 
 ## License

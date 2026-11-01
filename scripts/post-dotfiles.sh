@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # post-dotfiles hook: state that apps generate on first run but .zshrc expects,
-# and fortune's indexes. The dev module adds post-dotfiles.dev.sh after it.
+# and fortune's indexes. The dev module adds dev/post-dotfiles.sh after it.
 set -euo pipefail
 
 # .zshrc sources the bash `br` launcher at a fixed path; `broot --install` would
