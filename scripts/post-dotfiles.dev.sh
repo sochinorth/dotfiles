@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The dev module's half of the post-dotfiles hook (mise.dev.toml; runs after
-# post-dotfiles.sh): kak-tree-sitter's grammars and the links Claude Code's
-# config dirs need.
+# post-dotfiles.sh): kak-tree-sitter's grammars, the links Claude Code's config
+# dirs need, pi and its shims, and linger for the dropbear user unit.
 set -euo pipefail
 
 # kak-tree-sitter's grammars and queries for these languages (fetched and
@@ -38,3 +38,14 @@ for f in CLAUDE.md keybindings.json history.jsonl \
 		echo "post-dotfiles: $dst should link to $src; merge it there and remove it" >&2
 	fi
 done
+
+# pi (pi.dev's coding agent) is a bun global. It runs node, npm and npx, which
+# this machine doesn't have: ~/.local/pi-shims holds bun under those names, and
+# .zshrc's pi alias puts it first on PATH for pi alone. `bun update -g` updates it.
+[[ -x ~/.bun/bin/pi ]] || bun add -g @earendil-works/pi-coding-agent
+mkdir -p ~/.local/pi-shims
+for f in node npm npx; do ln -sfn /usr/bin/bun ~/.local/pi-shims/$f; done
+
+# The dropbear user unit (mise.dev.toml) has to outlive logins, which is linger.
+# Root, once.
+[[ -e /var/lib/systemd/linger/$USER ]] || sudo loginctl enable-linger "$USER"

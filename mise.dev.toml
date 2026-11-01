@@ -1,5 +1,6 @@
 # Dev module, layered on top of mise.toml: toolchains, debuggers, language
-# tooling for Kakoune, Claude Code.
+# tooling for Kakoune, coding agents (Claude Code, OpenCode, pi), and SSH in
+# (dropbear, as a user service).
 #	mise -E dev bootstrap
 # (.miserc.local.toml can select it by default on a dev machine.) Remove
 # everything this module manages with
@@ -25,11 +26,28 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.dev.sh'"
 "pacman:cmake" = "latest"
 "pacman:gdb" = "latest"
 "pacman:lldb" = "latest"
-"pacman:bun" = "latest"
+"pacman:bun" = "latest"			# also runs pi, a bun global (post-dotfiles hook)
+"pacman:python-pip" = "latest"
 
 # AI tools (cachyos repo); bubblewrap is Claude Code's Bash sandbox
 "pacman:claude-code" = "latest"
 "pacman:bubblewrap" = "latest"
+"pacman:opencode" = "latest"		# update with pacman, not `opencode upgrade`
+
+# SSH into this box without root: dropbear as a user service (below)
+"pacman:dropbear" = "latest"
+
+# --- user services ------------------------------------------------------------
+
+# Dropbear on :22222, as you (no root, so no other user's logins), keys only
+# (-s), the host key generated on first start. It runs without a login session
+# only with linger, which the post-dotfiles hook enables. Who may log in:
+# ~/.ssh/authorized_keys (below).
+[bootstrap.linux.systemd.units.dropbear]
+description = "Dropbear SSH (user)"
+exec_start_pre = ["/bin/sh -c 'test -f %h/.config/dropbear/hostkey_ed25519 || { mkdir -p %h/.config/dropbear && dropbearkey -t ed25519 -f %h/.config/dropbear/hostkey_ed25519; }'"]
+exec_start = "/usr/bin/dropbear -F -E -s -p 22222 -r %h/.config/dropbear/hostkey_ed25519 -P %t/dropbear.pid"
+restart = "on-failure"
 
 [dotfiles]
 # Claude Code, in layers: what both claude and claude-go share is managed settings
@@ -51,3 +69,12 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.dev.sh'"
 "~/.claude.go/routatic.json" = { source = "dotfiles/claude/routatic.go.json", mode = "symlink" }
 # onboarding counts as done there (machineID is random per config dir, not checked); Claude Code owns the other keys
 "~/.claude.go/.claude.json/onboarding" = { source = "dotfiles/claude/claude.go.json", merge = true }
+# OpenCode: the global config and the codex-sale plugin (codex.sale's models,
+# listed live) are edited in place. cli.json is the TUI's to write (theme,
+# settings), only seeded. Credentials, sessions and model picks live in its
+# database (~/.local/share/opencode), not tracked; /connect them again.
+"~/.config/opencode/opencode.json" = { source = "dotfiles/opencode/opencode.json", mode = "symlink" }
+"~/.config/opencode/plugins/codex-sale" = { source = "dotfiles/opencode/plugins/codex-sale", mode = "symlink" }
+"~/.config/opencode/cli.json/defaults" = { source = "dotfiles/opencode/cli.json", merge = "missing" }
+# who may log in through dropbear (the phone); a copy at 0600, like ~/.ssh/config
+"~/.ssh/authorized_keys" = { source = "dotfiles/ssh/authorized_keys", mode = "copy", permissions = "0600" }

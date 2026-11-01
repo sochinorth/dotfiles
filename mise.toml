@@ -86,6 +86,7 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:openssh" = "latest"
 "pacman:socat" = "latest"
 "pacman:tcpdump" = "latest"
+"pacman:wireguard-tools" = "latest"	# wg, wg-quick
 
 # --- system files (written through sudo = fudo -> doas) ----------------------
 

@@ -46,7 +46,7 @@ export EDITOR=kak
 export VISUAL=kak
 export FUDO_HIDE=1
 
-path+=("$HOME/.local/bin")
+path+=("$HOME/.local/bin" "$HOME/.bun/bin")
 # platform-specific bits (e.g. WSL's Windows PATH), deployed by mise.<env>.toml
 for f in ~/.config/zsh/conf.d/*.zsh(N); do source $f; done
 
@@ -74,6 +74,8 @@ alias ll='eza -l --git --group-directories-first'
 alias cat='bat -pp'
 alias grep='grep --color=auto'
 alias tree='eza --tree'
+
+alias pi='PATH="$HOME/.local/pi-shims:$PATH" pi'
 
 lk() {
 	local dir
