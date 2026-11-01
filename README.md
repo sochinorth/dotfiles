@@ -27,7 +27,7 @@ mise bootstrap unapply dev     # turn a dev box back into a generic one
 Each module keeps what it brings in its own directory (`wsl/`, `dev/`), so `dotfiles/`,
 `files/` and `scripts/` are only the generic part's. What a module adds to `.zshrc` goes in
 `~/.config/zsh/conf.d/*.zsh`, which `.zshrc` sources: each deploys its own drop-in
-(`wsl/zsh/wsl.zsh`: Windows PATH; `dev/zsh/dev.zsh`: bun's globals, pi).
+(`wsl/zsh/wsl.zsh`: Windows PATH; `dev/zsh/dev.zsh`: bun's globals, pi, the direnv hook).
 
 **Adding another platform** (e.g. bare metal): create `mise.baremetal.toml` with
 its sources in `baremetal/`, and select it with `-E baremetal` or in that machine's
