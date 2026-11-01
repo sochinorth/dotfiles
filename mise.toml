@@ -1,10 +1,13 @@
 # Generic Arch setup (Zen 4): CachyOS znver4 + Chaotic-AUR repos (+ my own sochinorth repo), doas
-# with fudo standing in for sudo. Platform modules layer on top:
-#	mise bootstrap			# this file only (+ whatever .miserc.local.toml selects)
-#	mise -E wsl bootstrap	# + mise.wsl.toml
+# with fudo standing in for sudo; the shell, CLI and editor I want on any machine,
+# server or router included. Modules layer on top:
+#	mise bootstrap				# this file only (+ whatever .miserc.local.toml selects)
+#	mise -E dev bootstrap		# + mise.dev.toml: toolchains, debuggers, Claude Code
+#	mise -E wsl bootstrap		# + mise.wsl.toml
+#	mise -E dev,wsl bootstrap	# both
 #
 # Fresh machine: install-root.sh as root once, then as your user:
-#	mise trust && mise [-E wsl] bootstrap
+#	mise trust && mise [-E dev,wsl] bootstrap
 # See README.md for the order things happen in and why.
 
 # --- hooks -------------------------------------------------------------------
@@ -45,7 +48,6 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:starship" = "latest"
 "pacman:fzf" = "latest"
 "pacman:zoxide" = "latest"
-"pacman:direnv" = "latest"
 "pacman:fortune-mod" = "latest"
 
 # cli
@@ -66,39 +68,24 @@ post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.sh'"
 "pacman:broot" = "latest"
 "pacman:walk" = "latest"			# chaotic-aur; used by lk() in .zshrc
 "pacman:tealdeer" = "latest"
-"pacman:just" = "latest"
-"pacman:kakoune" = "latest"
-"pacman:kakoune-lsp" = "latest"
-"pacman:kak-tree-sitter" = "latest"	# sochinorth repo (built by GitHub Actions); grammars: ktsctl sync (post-dotfiles hook)
-"pacman:tmux" = "latest"			# kakmux (~/.local/bin, the kakmux submodule): kak with a tmux-drawn bufferline; kakbr
-
-# dev
-"pacman:git" = "latest"
-"pacman:git-delta" = "latest"
-"pacman:git-filter-repo" = "latest"
-"pacman:github-cli" = "latest"		# gh
-"pacman:gcc" = "latest"
-"pacman:clang" = "latest"
-"pacman:mingw-w64-gcc" = "latest"	# Windows cross-compiler
-"pacman:make" = "latest"
-"pacman:cmake" = "latest"
-"pacman:diffutils" = "latest"
-"pacman:patch" = "latest"
-"pacman:fakeroot" = "latest"
-"pacman:gdb" = "latest"
-"pacman:lldb" = "latest"
 "pacman:strace" = "latest"
-"pacman:bun" = "latest"
+"pacman:kakoune" = "latest"
+"pacman:tmux" = "latest"			# kakmux (~/.local/bin, the kakmux submodule): kak with a tmux-drawn bufferline; kakbr
+"pacman:git" = "latest"
+"pacman:git-delta" = "latest"		# core.pager in gitconfig
 "pacman:mise" = "latest"
 
-# net / sandboxing
+# makepkg's share of base-devel (aur: packages build with it; fudo-git first, in pre-packages)
+"pacman:gcc" = "latest"
+"pacman:make" = "latest"
+"pacman:fakeroot" = "latest"
+"pacman:diffutils" = "latest"
+"pacman:patch" = "latest"
+
+# net
 "pacman:openssh" = "latest"
 "pacman:socat" = "latest"
 "pacman:tcpdump" = "latest"
-"pacman:bubblewrap" = "latest"
-
-# AI tools (cachyos repo)
-"pacman:claude-code" = "latest"
 
 # --- system files (written through sudo = fudo -> doas) ----------------------
 
@@ -174,25 +161,6 @@ mode = "0644"
 "~/.local/lib/broot-opener/xdg-open" = { source = "dotfiles/config/kak/scripts/broot-open", mode = "symlink" }
 "~/.local/bin/kakbr-sidebar" = { source = "dotfiles/config/kak/scripts/kakbr-sidebar", mode = "symlink" }
 "~/.local/bin/kakmux" = { source = "dotfiles/config/kak/scripts/kakmux", mode = "symlink" }
-# Claude Code, in layers: what both claude and claude-go share is managed settings
-# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/etc:
-# wins over everything, edits apply at Claude Code's next start); each one's own
-# settings.json is Claude Code's to write (/model, /theme, /config), not tracked,
-# only seeded here; claude-go adds settings.go.json on top (--settings).
-# ~/.claude.json is app state, not tracked.
-"~/.claude/settings.json/defaults" = { source = "dotfiles/claude/settings.claude.json", merge = "missing" }
-# the status line both run (managed-settings.json): which one, model, dir @ branch, context, limits
-"~/.claude/statusline.sh" = { source = "dotfiles/claude/statusline.sh", mode = "symlink" }
-# stock claude's theme: dark with an orange-tinted prompt border (go.json tints it blue)
-"~/.claude/themes/claude.json" = { source = "dotfiles/claude/themes/claude.json", mode = "symlink" }
-# ~/.claude.go (claude-go in .zshrc): Claude Code on OpenCode Go. post-dotfiles links
-# the rest of ~/.claude into it; only the theme and the upstream differ (settings.go.json)
-"~/.claude/themes/go.json" = { source = "dotfiles/claude/themes/go.json", mode = "symlink" }
-"~/.claude.go/settings.go.json" = { source = "dotfiles/claude/settings.go.json", mode = "symlink" }
-# the proxy claude-go runs alongside (Anthropic -> OpenAI for GLM & co.); it keeps catalog/ next to this path
-"~/.claude.go/routatic.json" = { source = "dotfiles/claude/routatic.go.json", mode = "symlink" }
-# onboarding counts as done there (machineID is random per config dir, not checked); Claude Code owns the other keys
-"~/.claude.go/.claude.json/onboarding" = { source = "dotfiles/claude/claude.go.json", merge = true }
 "~/.config/btop/btop.conf" = { source = "dotfiles/config/btop/btop.conf", mode = "copy" }
 # fortune cookies beyond fortune-mod's; post-dotfiles indexes them, .zshrc reads them
 "~/.local/share/fortune/*" = { source = "dotfiles/fortune/*", mode = "symlink" }

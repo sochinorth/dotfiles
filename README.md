@@ -6,7 +6,8 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 
 | File | What it is | Sources |
 | --- | --- | --- |
-| `mise.toml` | Generic: repos, doas/fudo, packages, `/etc` basics, dotfiles | `files/`, `dotfiles/`, `scripts/` |
+| `mise.toml` | Generic, for any machine (servers, routers too): repos, doas/fudo, shell, CLI, Kakoune, `/etc` basics, dotfiles | `files/`, `dotfiles/`, `scripts/` |
+| `mise.dev.toml` | Dev module: toolchains (clang, cmake, mingw-w64, bun), debuggers, gh, direnv, just, kakoune-lsp + kak-tree-sitter, Claude Code (+ bubblewrap) and its config | `dotfiles/claude/`, `scripts/post-dotfiles.dev.sh` |
 | `mise.wsl.toml` | WSL module: `wsl.conf`, xclip → win32yank shim, the stock /tmp cleaner unmasked (WSLg's X socket exempt), `.wslconfig`, Windows PATH, win32yank (AUR) | `wsl/` |
 | `.miserc.local.toml` | Per machine, gitignored: which modules a plain `mise bootstrap` loads | |
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
@@ -17,8 +18,10 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 ```sh
 mise bootstrap                 # generic + modules from .miserc.local.toml
 mise -E wsl bootstrap          # generic + WSL, explicitly
+mise -E dev,wsl bootstrap      # generic + dev + WSL (this dev box)
 MISE_ENV=none mise bootstrap   # generic only, overriding .miserc.local.toml
 mise bootstrap unapply wsl     # remove what the WSL module manages
+mise bootstrap unapply dev     # turn a dev box back into a generic one
 ```
 
 Platform tweaks that belong in `.zshrc` go in `~/.config/zsh/conf.d/*.zsh`, which
@@ -41,7 +44,7 @@ wsl --terminate archlinux
 
 # 3. as your user
 git clone --recurse-submodules <this repo> ~/setup && cd ~/setup
-mise trust && mise -E wsl bootstrap --dry-run && mise -E wsl bootstrap   # drop -E wsl on bare metal
+mise trust && mise -E dev,wsl bootstrap --dry-run && mise -E dev,wsl bootstrap   # drop dev on a server/router, wsl on bare metal
 ```
 
 Then copy `~/.ssh/id_ed25519_*` over by hand (keys are deliberately not in the repo). Hosts that only matter on one machine go in `~/.ssh/config.local`, which `~/.ssh/config` includes.
@@ -65,7 +68,7 @@ That dependency chain fixes the order:
    - installs `paru` (prebuilt, cachyos repo), removes real sudo only after `doas true` succeeds, then `paru` installs fudo-git
 3. `[bootstrap.packages]`: pacman, now through sudo → fudo → doas; `aur:` entries through paru, which uses the stock `/etc/paru.conf` and elevates through sudo → fudo → doas too. Don't create an empty `~/.config/paru/paru.conf`: any user file replaces `/etc/paru.conf` and loses its defaults.
 4. `[bootstrap.files]`: `/etc` configs; with WSL, also the `/usr/local/bin/xclip` → `win32yank.exe` shim.
-5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hook (broot `br` launcher, tealdeer cache, kak-tree-sitter grammars, `/etc/claude-code` linked to `dotfiles/claude/etc`, `~/.claude` linked into `~/.claude.go`, fortune indexes).
+5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hooks: `scripts/post-dotfiles.sh` (broot `br` launcher, tealdeer cache, fortune indexes), then with dev `scripts/post-dotfiles.dev.sh` (kak-tree-sitter grammars, `/etc/claude-code` linked to `dotfiles/claude/etc`, `~/.claude` linked into `~/.claude.go`). Hooks from each file add up; a module's hook doesn't replace the generic one.
 6. Login shell → zsh; with WSL, the `final` hook writes `.wslconfig` on the Windows side.
 
 ## Gotchas captured here
@@ -79,7 +82,7 @@ That dependency chain fixes the order:
 - Claude Code's notifications (permission prompts, and "waiting for your input" after a minute idle) go out as OSC 777 (`preferredNotifChannel: "ghostty"` in managed settings; `auto` only picks it under ghostty). The terminal turns them into desktop notifications: ghostty, foot, wezterm and VTE terminals do; Windows Terminal from 1.26 (Preview as of 2026-10). Others ignore the sequence. Under tmux it's wrapped for passthrough, which needs `allow-passthrough on`.
 - btop rewrites its own config, so that one is a copy. After changing settings in the app, run `mise dot add <path>`.
 - broot opens files in Kakoune: Enter is a verb in `verbs.hjson`; double-click is hard-wired to the system opener, so `broot-open` is also installed as `wslview`/`xdg-open` in `~/.local/lib/broot-opener`, a dir only broot gets on PATH (`broot()` in kakmux's `shell/kakmux.zsh`, which `.zshrc` sources; `kakbr-sidebar`). In `kakbr`'s sidebar both go to kakbr's kak; elsewhere in tmux, to a kak pane in broot's window (kakrc labels each kak client's pane). `kakmux` and `kakbr` each run their own tmux server (`kakmux-PID`, `kakbr-PID`), so each is one pane in whatever runs it; kakbr's right pane is just a `kakmux`.
-- kak-tree-sitter turns off Kakoune's own highlighting for every language it knows, grammar installed or not. So kakrc writes `~/.config/kak-tree-sitter/config.toml` (not tracked; regenerated when the installed set changes) to hand every language without a grammar back to Kakoune. The post-dotfiles hook installs a handful (C/C++, Rust, Python, Bash, Markdown, TOML, JSON, YAML); add more with `ktsctl sync <lang>`.
+- kak-tree-sitter turns off Kakoune's own highlighting for every language it knows, grammar installed or not. So kakrc writes `~/.config/kak-tree-sitter/config.toml` (not tracked; regenerated when the installed set changes) to hand every language without a grammar back to Kakoune. The dev module's post-dotfiles hook installs a handful (C/C++, Rust, Python, Bash, Markdown, TOML, JSON, YAML); add more with `ktsctl sync <lang>`.
 - Not captured: secrets (SSH keys, app credentials), project checkouts, timezone/hostname files that WSL generates. What that means on a given machine goes in its `README.local.md`.
 
 ## License

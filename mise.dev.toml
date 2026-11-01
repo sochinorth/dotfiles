@@ -1,0 +1,53 @@
+# Dev module, layered on top of mise.toml: toolchains, debuggers, language
+# tooling for Kakoune, Claude Code.
+#	mise -E dev bootstrap
+# (.miserc.local.toml can select it by default on a dev machine.) Remove
+# everything this module manages with
+#	mise bootstrap unapply dev
+
+# Runs after mise.toml's own post-dotfiles hook (hooks from each file add up).
+[bootstrap.hooks]
+post-dotfiles = "bash '{{ config_root }}/scripts/post-dotfiles.dev.sh'"
+
+[bootstrap.packages]
+"pacman:direnv" = "latest"
+"pacman:just" = "latest"
+
+# Kakoune as an IDE; kakrc uses each only when it's installed
+"pacman:kakoune-lsp" = "latest"
+"pacman:kak-tree-sitter" = "latest"	# sochinorth repo (built by GitHub Actions); grammars: ktsctl sync (post-dotfiles hook)
+
+# dev (gcc, make, fakeroot, diffutils, patch are generic: makepkg needs them)
+"pacman:git-filter-repo" = "latest"
+"pacman:github-cli" = "latest"		# gh
+"pacman:clang" = "latest"
+"pacman:mingw-w64-gcc" = "latest"	# Windows cross-compiler
+"pacman:cmake" = "latest"
+"pacman:gdb" = "latest"
+"pacman:lldb" = "latest"
+"pacman:bun" = "latest"
+
+# AI tools (cachyos repo); bubblewrap is Claude Code's Bash sandbox
+"pacman:claude-code" = "latest"
+"pacman:bubblewrap" = "latest"
+
+[dotfiles]
+# Claude Code, in layers: what both claude and claude-go share is managed settings
+# (/etc/claude-code, a link post-dotfiles makes to dotfiles/claude/etc:
+# wins over everything, edits apply at Claude Code's next start); each one's own
+# settings.json is Claude Code's to write (/model, /theme, /config), not tracked,
+# only seeded here; claude-go adds settings.go.json on top (--settings).
+# ~/.claude.json is app state, not tracked.
+"~/.claude/settings.json/defaults" = { source = "dotfiles/claude/settings.claude.json", merge = "missing" }
+# the status line both run (managed-settings.json): which one, model, dir @ branch, context, limits
+"~/.claude/statusline.sh" = { source = "dotfiles/claude/statusline.sh", mode = "symlink" }
+# stock claude's theme: dark with an orange-tinted prompt border (go.json tints it blue)
+"~/.claude/themes/claude.json" = { source = "dotfiles/claude/themes/claude.json", mode = "symlink" }
+# ~/.claude.go (claude-go in .zshrc): Claude Code on OpenCode Go. post-dotfiles links
+# the rest of ~/.claude into it; only the theme and the upstream differ (settings.go.json)
+"~/.claude/themes/go.json" = { source = "dotfiles/claude/themes/go.json", mode = "symlink" }
+"~/.claude.go/settings.go.json" = { source = "dotfiles/claude/settings.go.json", mode = "symlink" }
+# the proxy claude-go runs alongside (Anthropic -> OpenAI for GLM & co.); it keeps catalog/ next to this path
+"~/.claude.go/routatic.json" = { source = "dotfiles/claude/routatic.go.json", mode = "symlink" }
+# onboarding counts as done there (machineID is random per config dir, not checked); Claude Code owns the other keys
+"~/.claude.go/.claude.json/onboarding" = { source = "dotfiles/claude/claude.go.json", merge = true }
