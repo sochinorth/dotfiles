@@ -120,3 +120,5 @@ fi
 
 eval "$(starship init zsh)"
 
+
+source /home/sochinorth/.config/broot/launcher/bash/br
