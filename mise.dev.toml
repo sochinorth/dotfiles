@@ -78,13 +78,14 @@ restart_sec = "5"
 # bun's globals on PATH, and the pi alias (see the post-dotfiles hook)
 "~/.config/zsh/conf.d/dev.zsh" = { source = "dev/zsh/dev.zsh", mode = "symlink" }
 # OpenCode: the global config, instructions and plugins (codex.sale's live
-# models, Claude's entrypoint environment, Claude transcript cleanup, session
-# scratchpads, tool-call descriptions) are edited in place. cli.json is the
-# TUI's to write (theme,
-# settings), only seeded. Credentials, sessions and model picks live in its
-# database (~/.local/share/opencode), not tracked; /connect them again.
+# models, transcript-tree compaction, Claude's entrypoint environment, Claude
+# transcript cleanup, session scratchpads, tool-call descriptions) are edited
+# in place. cli.json is the TUI's to write (theme, settings), only seeded.
+# Credentials, sessions and model picks live in its database
+# (~/.local/share/opencode), not tracked; /connect them again.
 "~/.config/opencode/opencode.json" = { source = "dev/opencode/opencode.json", mode = "symlink" }
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
+"~/.config/opencode/plugins/compaction" = { source = "dev/opencode/plugins/compaction", mode = "symlink" }
 "~/.config/opencode/plugins/claude-entrypoint" = { source = "dev/opencode/plugins/claude-entrypoint", mode = "symlink" }
 "~/.config/opencode/plugins/claude-transcripts" = { source = "dev/opencode/plugins/claude-transcripts", mode = "symlink" }
 "~/.config/opencode/plugins/follow-tools" = { source = "dev/opencode/plugins/follow-tools", mode = "symlink" }
