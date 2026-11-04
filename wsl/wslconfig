@@ -1,3 +1,8 @@
+# keep the distro running with no terminal open (default: shut down 15 s after
+# the last one closes, user services and all)
+[general]
+instanceIdleTimeout=-1
+
 [wsl2]
 networkingMode=Mirrored
 autoProxy=false
