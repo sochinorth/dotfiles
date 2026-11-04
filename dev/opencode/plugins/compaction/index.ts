@@ -11,6 +11,7 @@
 //
 // Options, in opencode.json:
 //   "plugins": [{ "package": "./plugins/compaction", "options": { ... } }]
+//   native  false: summary compaction everywhere. Default true.
 //   spill   tool outputs over this many bytes are written whole. Default 4096.
 //
 // Edits need `opencode service restart`.
@@ -25,6 +26,6 @@ export default Plugin.define({
 		await ctx.session.hook("context", (event) => t.sync(event.sessionID))
 		// a turn's last reply, logged without waiting for the next request
 		await ctx.session.hook("experimental.idle", (event) => t.sync(event.sessionID))
-		return checkpoint(ctx, t)
+		return checkpoint(ctx, t, { native: ctx.options.native !== false })
 	},
 })

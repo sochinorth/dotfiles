@@ -7,14 +7,19 @@
 // ctx.session.generate so it reuses the turns' cached prefix; no recent tail
 // beside it. A failed or malformed reply leaves OpenCode's summary.
 //
+// Native compaction (native.ts): the provider writes an encrypted checkpoint,
+// steered by a last message about the transcript, and the model writes the
+// readable index too, for a switch to another model.
+//
 // After either, every later request gets what after.ts builds, right after the
 // checkpoint and so cache-stable. Injected, not stored: a message admitted
 // mid-run would reach the model a step late.
 //
-// /compact <text>: instructions for the index.
+// /compact <text>: instructions for the index, or for the native steering message.
 import { createHash } from "node:crypto"
 import type { Plugin } from "@opencode/plugin"
 import { after, type After } from "./after"
+import { native, ref, type NativeState } from "./native"
 import * as Prompt from "./prompt"
 import { textOf, type State, type Transcript } from "./transcript"
 
@@ -31,10 +36,11 @@ const hash = (text: string) => createHash("sha256").update(text).digest("base64u
 const userMessage = (like: any, text: string) =>
 	typeof like?.constructor?.user === "function" ? like.constructor.user(text) : { role: "user", content: [{ type: "text", text }] }
 
-// the session's state.json fields this module keeps; `anchor`
+// the session's state.json fields this module and native.ts keep; `anchor`
 // tells which checkpoint the current block follows
 type Mine = State & {
 	after?: { current?: After & { anchor: string }; pending?: After & { summary?: string } }
+	native?: NativeState
 }
 
 /** A session's compaction under way, or about to be: what the hooks hand each other. */
@@ -42,6 +48,7 @@ export type Work = {
 	focus?: string // /compact instructions
 	reason?: string // the running compaction's: "auto" or "manual"
 	maxTokens?: number // of the index request, while it runs
+	port?: { index: string; keepID?: string } // the index the next compaction records, after a model switch
 }
 
 // A plugin instance per location, one process, every event to each: work is
@@ -87,8 +94,9 @@ function opening(messages: readonly any[]): { index: number; anchor: string } | 
 }
 
 /** Registers the compaction's hooks, /compact and its event subscription; returns their teardown. */
-export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
+export async function checkpoint(ctx: Plugin.Context, t: Transcript, options: { native?: boolean } = {}) {
 	const log = (...args: unknown[]) => console.error(LOG, ...args)
+	const nativeEvents = await native(ctx, t, work, log, options.native !== false)
 	const state = (sessionID: string) => t.state(sessionID) as Promise<Mine | undefined>
 
 	// puts the text after the checkpoint it followed
@@ -141,8 +149,8 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 	await ctx.session.hook("compaction", async (event) => {
 		const sessionID = event.sessionID
 		const w = work(sessionID)
-		const instructions = w.focus
-		w.focus = undefined
+		const { focus: instructions, port } = w
+		w.focus = w.port = undefined
 		// an automatic compaction runs before the step's context hook: log the last step first
 		await t.sync(sessionID)
 		const dir = await t.dir(sessionID)
@@ -153,9 +161,17 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 		const { directory } = (await ctx.session.get({ sessionID })).location
 		const models = await ctx.model.list({ location: { directory } })
 		const model = models.data.find((m) => m.providerID === event.model.providerID && m.id === event.model.id)
-		const reply = await index(sessionID, dir, instructions, model?.limit.output)
+		const reply = port?.index ?? (await index(sessionID, dir, instructions, model?.limit.output))
 		const next = async (index?: string) => after(directory, dir, await ctx.session.context({ sessionID }), s.leaves ?? [], earlier, index)
 
+		if (!port && model?.settings?.compaction?.type === "native") {
+			// last, where the provider's compaction takes over (the system prompt didn't steer it)
+			event.messages.push(userMessage(event.messages.at(-1), Prompt.native(dir, instructions)))
+			s.native = reply ? { model: ref(event.model), index: reply } : undefined
+			s.after = { ...s.after, pending: await next(reply) }
+			return void (await t.save(sessionID))
+		}
+		s.native = undefined
 		if (!reply) {
 			// OpenCode writes the summary; the note, facts and files still follow it
 			log(sessionID, "using OpenCode's summary")
@@ -165,7 +181,7 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 
 		const summary = [Prompt.HEADER, "", reply, ...(works.get(sessionID)?.reason === "auto" ? ["", Prompt.RESUME] : [])].join("\n")
 		// OpenCode puts its own keepID under this metadata; null keeps no tail
-		event.result = { summary, metadata: { keepID: null, ...(instructions ? { instructions } : {}) } }
+		event.result = { summary, metadata: { keepID: port?.keepID ?? null, ...(instructions ? { instructions } : {}) } }
 		s.after = { ...s.after, pending: { ...(await next()), summary } }
 		await t.save(sessionID)
 	})
@@ -182,7 +198,7 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 		})
 	})
 
-	const types = ["session.compaction.started", "session.compaction.ended", "session.compaction.failed", "session.deleted"] as const
+	const types = ["session.compaction.started", "session.compaction.ended", "session.compaction.failed", "session.model.selected", "session.deleted"] as const
 	type Event = { type: (typeof types)[number]; data: any }
 	const handle = async ({ type, data }: Event) => {
 		const { sessionID } = data
@@ -190,13 +206,18 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 		const w = works.get(sessionID)
 		if (w) w.reason = undefined
 		if (type === "session.deleted") return void works.delete(sessionID)
-		if (type === "session.compaction.failed") {
-			// what it would have left is void
+		if (type === "session.model.selected") await nativeEvents.selected(sessionID, data.model)
+		else if (type === "session.compaction.ended") await nativeEvents.ended(sessionID)
+		else {
+			// failed: what it would have left is void
+			if (w) w.port = undefined
 			const s = await state(sessionID)
-			if (s?.after?.pending) {
-				s.after.pending = undefined
+			if (s?.after?.pending || (s?.native && !s.native.id)) {
+				if (s.after) s.after.pending = undefined
+				if (s.native && !s.native.id) s.native = undefined
 				await t.save(sessionID)
 			}
+			await nativeEvents.failed(sessionID, data.error)
 		}
 		settle(sessionID)
 	}
