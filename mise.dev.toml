@@ -59,7 +59,7 @@ restart = "on-failure"
 # gets a terminal's environment (PATH, EDITOR, ...), not the user manager's
 # bare one. The server exits 130 on SIGTERM; a drop-in (below) counts that as
 # success, which mise has no key for. No Restart=: `opencode service stop`
-# means stopped, and web-gui starts it again when it's next needed.
+# means stopped, and opencode.web-gui starts it again when it's next needed.
 [bootstrap.linux.systemd.units.opencode]
 description = "OpenCode background service"
 type = "forking"
@@ -68,7 +68,7 @@ timeout_start_sec = "90"
 
 # OpenCode Web with GUI plugins, logged in, on http://127.0.0.1:44444
 # (dev/opencode/web-gui.ts); it starts the service above when it's down.
-[bootstrap.linux.systemd.units.web-gui]
+[bootstrap.linux.systemd.units."opencode.web-gui"]
 description = "OpenCode Web with GUI plugins (proxy on 127.0.0.1:44444)"
 exec_start = "/usr/bin/bun {{ config_root }}/dev/opencode/web-gui.ts"
 restart = "on-failure"

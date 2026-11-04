@@ -1,6 +1,6 @@
 // Desktop GUI plugins in OpenCode Web, through a local proxy in front of the
 // background service: http://127.0.0.1:44444 (or localhost:44444). The
-// dev.mise.web-gui user unit runs it (mise.dev.toml), so it's up from boot.
+// dev.mise.opencode.web-gui user unit runs it (mise.dev.toml), so it's up from boot.
 //
 // The web app contains the desktop app's GUI plugin host, and GUI plugins run
 // in a browser too (ctx.app.platform is "web" there). A plain tab lacks only

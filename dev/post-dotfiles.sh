@@ -16,8 +16,9 @@ for f in node npm npx; do ln -sfn /usr/bin/bun ~/.local/pi-shims/$f; done
 # watched directory. After editing the plugin's gui/, rerun this line.
 (cd "$(dirname "$0")/opencode/build" && bun install --frozen-lockfile && bun run build)
 
-# The user units (mise.dev.toml: OpenCode's server, web-gui, dropbear) have to
-# run from boot and outlive logins, which is linger. Root, once.
+# The user units (mise.dev.toml: OpenCode's server and web GUI proxy,
+# dropbear) have to run from boot and outlive logins, which is linger. Root,
+# once.
 [[ -e /var/lib/systemd/linger/$USER ]] || sudo loginctl enable-linger "$USER"
 
 # kak-tree-sitter's grammars and queries for these languages (fetched and

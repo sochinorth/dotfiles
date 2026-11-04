@@ -1,5 +1,5 @@
 // The GUI part (built into ../dist/gui-experimental.cjs): the desktop app loads
-// it, and OpenCode Web through the web-gui plugin.
+// it, and OpenCode Web through the web-gui proxy.
 import { Plugin, Style } from "@opencode/plugin/gui"
 import { CSS, start } from "./timeline"
 

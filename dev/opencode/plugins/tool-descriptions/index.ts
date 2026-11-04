@@ -10,7 +10,7 @@
 // differ from the turns' misses their cached prompt prefix.
 //
 // The timeline half is the GUI part, gui/, built into dist/: the desktop app
-// loads it, and so does OpenCode Web opened through the web-gui plugin.
+// loads it, and so does OpenCode Web opened through the web-gui proxy.
 import { Plugin } from "@opencode/plugin"
 
 const TOOLS = ["shell", "edit", "write", "patch"]
