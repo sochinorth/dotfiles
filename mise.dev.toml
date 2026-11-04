@@ -84,6 +84,7 @@ restart_sec = "5"
 # Credentials, sessions and model picks live in its database
 # (~/.local/share/opencode), not tracked; /connect them again.
 "~/.config/opencode/opencode.json" = { source = "dev/opencode/opencode.json", mode = "symlink" }
+"~/.config/opencode/plugins/chatgpt-models" = { source = "dev/opencode/plugins/chatgpt-models", mode = "symlink" }
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
 "~/.config/opencode/plugins/compaction" = { source = "dev/opencode/plugins/compaction", mode = "symlink" }
 "~/.config/opencode/plugins/claude-entrypoint" = { source = "dev/opencode/plugins/claude-entrypoint", mode = "symlink" }
