@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The dev module's half of the post-dotfiles hook (mise.dev.toml; runs after
 # scripts/post-dotfiles.sh): pi and its shims, the tool-descriptions plugin's
-# build, linger for the dropbear user unit, and kak-tree-sitter's grammars.
+# build, linger for the user units, and kak-tree-sitter's grammars.
 set -euo pipefail
 
 # pi (pi.dev's coding agent) is a bun global. It runs node, npm and npx, which
@@ -16,8 +16,8 @@ for f in node npm npx; do ln -sfn /usr/bin/bun ~/.local/pi-shims/$f; done
 # watched directory. After editing the plugin's gui/, rerun this line.
 (cd "$(dirname "$0")/opencode/build" && bun install --frozen-lockfile && bun run build)
 
-# The dropbear user unit (mise.dev.toml) has to outlive logins, which is linger.
-# Root, once.
+# The user units (mise.dev.toml: OpenCode's server, dropbear) have to run from
+# boot and outlive logins, which is linger. Root, once.
 [[ -e /var/lib/systemd/linger/$USER ]] || sudo loginctl enable-linger "$USER"
 
 # kak-tree-sitter's grammars and queries for these languages (fetched and

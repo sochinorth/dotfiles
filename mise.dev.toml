@@ -1,6 +1,6 @@
 # Dev module, layered on top of mise.toml: toolchains, debuggers, language
 # tooling for Kakoune, coding agents (OpenCode, pi; Claude Code as a runtime),
-# and SSH in (dropbear, as a user service).
+# and user services: OpenCode's server, and SSH in (dropbear).
 #	mise -E dev bootstrap
 # (.miserc.local.toml can select it by default on a dev machine.)
 # Sources live in dev/. Remove everything this module manages with
@@ -51,6 +51,20 @@ exec_start_pre = ["/bin/sh -c 'test -f %h/.config/dropbear/hostkey_ed25519 || { 
 exec_start = "/usr/bin/dropbear -F -E -s -p 22222 -r %h/.config/dropbear/hostkey_ed25519 -P %t/dropbear.pid"
 restart = "on-failure"
 
+# OpenCode's background service, from boot rather than from whichever terminal
+# first needs it. `opencode service start` forks the server and returns once it
+# answers (a no-op when one already runs, which leaves this unit inactive). It
+# runs through a login zsh so the server, and every command its agents run,
+# gets a terminal's environment (PATH, EDITOR, ...), not the user manager's
+# bare one. The server exits 130 on SIGTERM; a drop-in (below) counts that as
+# success, which mise has no key for. No Restart=: `opencode service stop`
+# means stopped.
+[bootstrap.linux.systemd.units.opencode]
+description = "OpenCode background service"
+type = "forking"
+exec_start = "/usr/bin/zsh -lic 'exec /usr/bin/opencode service start'"
+timeout_start_sec = "90"
+
 [dotfiles]
 # bun's globals on PATH, and the pi alias (see the post-dotfiles hook)
 "~/.config/zsh/conf.d/dev.zsh" = { source = "dev/zsh/dev.zsh", mode = "symlink" }
@@ -70,6 +84,8 @@ restart = "on-failure"
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
 # Global instructions; OpenCode passes them to every provider, Claude Agent included.
 "~/.config/opencode/AGENTS.md" = { source = "dev/opencode/AGENTS.md", mode = "symlink" }
+# the opencode unit's exit status on SIGTERM (see the unit above)
+"~/.config/systemd/user/dev.mise.opencode.service.d/success.conf" = { source = "dev/systemd/opencode-success.conf", mode = "symlink" }
 # IDASQL: OpenCode uses each skill directory's basename as its ID, not the
 # grouping directory or frontmatter name. Prefix the links to avoid collisions;
 # keep upstream files and their relative reference paths intact.
