@@ -8,7 +8,7 @@
     "target": "es2022",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "types": [],
@@ -18,5 +18,5 @@
       "@opencode/plugin/gui": ["./node_modules/@opencode/plugin/dist/gui/index.d.ts"]
     }
   },
-  "files": ["../plugins/tool-descriptions/gui/gui.tsx"]
+  "files": ["../plugins/tool-descriptions/gui/gui.tsx", "../plugins/follow-tools/gui/gui.ts"]
 }

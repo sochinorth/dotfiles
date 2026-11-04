@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "PLUGIN=tool-descriptions vite build && PLUGIN=follow-tools vite build",
     "check": "tsc -p ."
   },
   "devDependencies": {

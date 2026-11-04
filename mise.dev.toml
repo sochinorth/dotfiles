@@ -87,6 +87,7 @@ restart_sec = "5"
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
 "~/.config/opencode/plugins/claude-entrypoint" = { source = "dev/opencode/plugins/claude-entrypoint", mode = "symlink" }
 "~/.config/opencode/plugins/claude-transcripts" = { source = "dev/opencode/plugins/claude-transcripts", mode = "symlink" }
+"~/.config/opencode/plugins/follow-tools" = { source = "dev/opencode/plugins/follow-tools", mode = "symlink" }
 "~/.config/opencode/plugins/scratchpad" = { source = "dev/opencode/plugins/scratchpad", mode = "symlink" }
 "~/.config/opencode/plugins/tool-descriptions" = { source = "dev/opencode/plugins/tool-descriptions", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }

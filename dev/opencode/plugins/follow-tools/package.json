@@ -1,0 +1,8 @@
+{
+  "name": "sochinorth.follow-tools",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./gui-experimental": "./dist/gui-experimental.cjs"
+  }
+}
