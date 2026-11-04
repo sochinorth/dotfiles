@@ -41,6 +41,7 @@ const userMessage = (like: any, text: string) =>
 type Mine = State & {
 	after?: { current?: After & { anchor: string }; pending?: After & { summary?: string } }
 	native?: NativeState
+	notice?: string
 }
 
 /** A session's compaction under way, or about to be: what the hooks hand each other. */
@@ -53,8 +54,9 @@ export type Work = {
 
 // A plugin instance per location, one process, every event to each: work is
 // shared here, so the command's instance and the session's see the same.
-const shared: { work?: Map<string, Work> } = ((globalThis as any)[Symbol.for("sochinorth.compaction.checkpoint")] ??= {})
+const shared: { work?: Map<string, Work>; notices?: Map<string, Promise<void>> } = ((globalThis as any)[Symbol.for("sochinorth.compaction.checkpoint")] ??= {})
 const works = (shared.work ??= new Map())
+const notices = (shared.notices ??= new Map())
 const work = (sessionID: string) => works.get(sessionID) ?? (works.set(sessionID, {}), works.get(sessionID)!)
 // drops a session's entry once nothing is under way, unless it was replaced meanwhile
 const settle = (sessionID: string, w = works.get(sessionID)) => {
@@ -98,6 +100,38 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript, options: { 
 	const log = (...args: unknown[]) => console.error(LOG, ...args)
 	const nativeEvents = await native(ctx, t, work, log, options.native !== false)
 	const state = (sessionID: string) => t.state(sessionID) as Promise<Mine | undefined>
+
+	// Keep a small durable marker visible in the UI without storing the full
+	// refmap in conversation history or causing another model turn.
+	const notice = async (sessionID: string) => {
+		const [first] = await ctx.session.context({ sessionID })
+		if (first?.type !== "compaction" || first.status !== "completed") return
+		const key = `${sessionID}:${first.id}`
+		const existing = notices.get(key)
+		if (existing) return existing
+		const run = (async () => {
+			const s = await state(sessionID)
+			if (!s || s.notice === first.id) return
+			const dir = await t.dir(sessionID)
+			if (!dir) return
+			const marker = Prompt.notice(dir)
+			await ctx.session.synthetic({
+				sessionID,
+				text: marker.text,
+				description: marker.description,
+				delivery: "queue",
+				resume: false,
+			})
+			s.notice = first.id
+			await t.save(sessionID)
+		})()
+		notices.set(key, run)
+		try {
+			await run
+		} finally {
+			if (notices.get(key) === run) notices.delete(key)
+		}
+	}
 
 	// puts the text after the checkpoint it followed
 	const inject = async (sessionID: string, messages: any[]) => {
@@ -207,7 +241,10 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript, options: { 
 		if (w) w.reason = undefined
 		if (type === "session.deleted") return void works.delete(sessionID)
 		if (type === "session.model.selected") await nativeEvents.selected(sessionID, data.model)
-		else if (type === "session.compaction.ended") await nativeEvents.ended(sessionID)
+		else if (type === "session.compaction.ended") {
+			await nativeEvents.ended(sessionID)
+			await notice(sessionID)
+		}
 		else {
 			// failed: what it would have left is void
 			if (w) w.port = undefined

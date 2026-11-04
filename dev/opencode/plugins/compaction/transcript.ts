@@ -132,10 +132,14 @@ export function transcript(ctx: Plugin.Context): Transcript {
 	const limit = typeof ctx.options.spill === "number" && ctx.options.spill > 0 ? ctx.options.spill : LEAF_BYTES
 
 	const dir = async (sessionID: string) => {
-		const pad = (globalThis as any)[Symbol.for("sochinorth.scratchpad")] as { dirs: Map<string, string>; queue?: Promise<void> } | undefined
+		const pad = (globalThis as any)[Symbol.for("sochinorth.scratchpad")] as
+			| { dirs: Map<string, string>; queue?: Promise<void>; prepare?: (ctx: Plugin.Context, sessionID: string) => Promise<void> }
+			| undefined
 		if (!pad || !SESSION_ID.test(sessionID)) return
+		let root = pad.dirs.get(sessionID)
+		if (!root || !existsSync(root)) await pad.prepare?.(ctx, sessionID)
 		await pad.queue
-		const root = pad.dirs.get(sessionID)
+		root = pad.dirs.get(sessionID)
 		if (!root) return
 		const path = join(root, "transcripts", sessionID)
 		mkdirSync(join(path, "log"), { recursive: true, mode: 0o700 })

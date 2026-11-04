@@ -26,7 +26,11 @@ const notFound = (e: any) => e?._tag === "Session.NotFoundError"
 
 // All plugin locations share one process. Serialize filesystem changes, cache
 // invalidation and instruction writes together so a move cannot race preparation.
-const state: { dirs: Map<string, string>; queue?: Promise<void> } = ((globalThis as any)[Symbol.for("sochinorth.scratchpad")] ??= { dirs: new Map() })
+const state: {
+	dirs: Map<string, string>
+	queue?: Promise<void>
+	prepare?: (ctx: Plugin.Context, sessionID: string) => Promise<void>
+} = ((globalThis as any)[Symbol.for("sochinorth.scratchpad")] ??= { dirs: new Map() })
 
 function enqueue(label: string, task: () => unknown) {
 	state.queue = Promise.resolve(state.queue).then(task).then(() => {}, (e) => console.error("scratchpad:", label, e))
@@ -161,6 +165,9 @@ async function sweep(ctx: Plugin.Context, only?: string) {
 export default Plugin.define({
 	id: "sochinorth.scratchpad",
 	async setup(ctx) {
+		// Compaction can begin before a prompt hydrates an older session. Let the
+		// transcript plugin use the same owner, fork, and path migration logic.
+		state.prepare = (context, sessionID) => prepare(context, sessionID)
 		if (!state.queue) void enqueue("sweep", () => sweep(ctx))
 		await ctx.session.hook("prompt", (event) => prepare(ctx, event.sessionID))
 		await ctx.session.hook("context", (event) => {

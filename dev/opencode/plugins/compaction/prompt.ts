@@ -63,3 +63,10 @@ export const RESTORED = "These are the files you read or changed most recently, 
 
 /** A native checkpoint's readable index, right after the encrypted one. */
 export const readable = (index: string) => `The index of the conversation before this point, written for this checkpoint:\n\n${index}`
+
+/** A small durable UI marker; the full index remains request-local. */
+export const notice = (dir: string) =>
+	({
+		description: "sochinorth.compaction: refmap checkpoint · state.json · transcript log/",
+		text: `Readable refmap: ${dir}/state.json\nTranscript: ${dir}/log/`,
+	})
