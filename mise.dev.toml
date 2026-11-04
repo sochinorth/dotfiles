@@ -1,6 +1,7 @@
 # Dev module, layered on top of mise.toml: toolchains, debuggers, language
 # tooling for Kakoune, coding agents (OpenCode, pi; Claude Code as a runtime),
-# and user services: OpenCode's server, and SSH in (dropbear).
+# and user services: OpenCode's server and its web GUI proxy, and SSH in
+# (dropbear).
 #	mise -E dev bootstrap
 # (.miserc.local.toml can select it by default on a dev machine.)
 # Sources live in dev/. Remove everything this module manages with
@@ -58,20 +59,28 @@ restart = "on-failure"
 # gets a terminal's environment (PATH, EDITOR, ...), not the user manager's
 # bare one. The server exits 130 on SIGTERM; a drop-in (below) counts that as
 # success, which mise has no key for. No Restart=: `opencode service stop`
-# means stopped.
+# means stopped, and web-gui starts it again when it's next needed.
 [bootstrap.linux.systemd.units.opencode]
 description = "OpenCode background service"
 type = "forking"
 exec_start = "/usr/bin/zsh -lic 'exec /usr/bin/opencode service start'"
 timeout_start_sec = "90"
 
+# OpenCode Web with GUI plugins on http://127.0.0.1:44444
+# (dev/opencode/web-gui.ts); it starts the service above when it's down.
+[bootstrap.linux.systemd.units.web-gui]
+description = "OpenCode Web with GUI plugins (proxy on 127.0.0.1:44444)"
+exec_start = "/usr/bin/bun {{ config_root }}/dev/opencode/web-gui.ts"
+restart = "on-failure"
+restart_sec = "5"
+
 [dotfiles]
 # bun's globals on PATH, and the pi alias (see the post-dotfiles hook)
 "~/.config/zsh/conf.d/dev.zsh" = { source = "dev/zsh/dev.zsh", mode = "symlink" }
 # OpenCode: the global config, instructions and plugins (codex.sale's live
 # models, Claude's entrypoint environment, Claude transcript cleanup, session
-# scratchpads, tool-call descriptions, GUI plugins in the web app) are edited
-# in place. cli.json is the TUI's to write (theme,
+# scratchpads, tool-call descriptions) are edited in place. cli.json is the
+# TUI's to write (theme,
 # settings), only seeded. Credentials, sessions and model picks live in its
 # database (~/.local/share/opencode), not tracked; /connect them again.
 "~/.config/opencode/opencode.json" = { source = "dev/opencode/opencode.json", mode = "symlink" }
@@ -80,7 +89,6 @@ timeout_start_sec = "90"
 "~/.config/opencode/plugins/claude-transcripts" = { source = "dev/opencode/plugins/claude-transcripts", mode = "symlink" }
 "~/.config/opencode/plugins/scratchpad" = { source = "dev/opencode/plugins/scratchpad", mode = "symlink" }
 "~/.config/opencode/plugins/tool-descriptions" = { source = "dev/opencode/plugins/tool-descriptions", mode = "symlink" }
-"~/.config/opencode/plugins/web-gui" = { source = "dev/opencode/plugins/web-gui", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
 # Global instructions; OpenCode passes them to every provider, Claude Agent included.
 "~/.config/opencode/AGENTS.md" = { source = "dev/opencode/AGENTS.md", mode = "symlink" }
