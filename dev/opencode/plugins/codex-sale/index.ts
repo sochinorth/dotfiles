@@ -68,8 +68,11 @@ export default Plugin.define({
 			name: "codex.sale",
 			integrationID: PROVIDER as Provider.Info["integrationID"],
 			activation: "auto",
-			package: "@opencode/ai/providers/openai-compatible/responses",
-			settings: { baseURL, reasoningEffort: "medium", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] },
+			// OpenAI's own route, not the generic openai-compatible one: only it can
+			// compact natively, which codex.sale passes through (plugins/compaction
+			// turns it on). Over HTTP, as the generic route ran.
+			package: "@opencode/ai/providers/openai/responses",
+			settings: { baseURL, transport: "http", reasoningEffort: "medium", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] },
 		}
 
 		// One stored value keeps list/source paired; ignore lists without provenance.
