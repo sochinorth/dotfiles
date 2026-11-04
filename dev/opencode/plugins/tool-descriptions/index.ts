@@ -7,8 +7,8 @@
 // Models get either patch (GPT) or edit and write (Claude); any absent tool is
 // skipped.
 //
-// The timeline half is the GUI part, gui/, built into dist/, which the
-// desktop app loads (OpenCode Web loads no plugin GUIs).
+// The timeline half is the GUI part, gui/, built into dist/: the desktop app
+// loads it, and so does OpenCode Web opened through the web-gui plugin.
 import { Plugin } from "@opencode/plugin"
 
 const TOOLS = ["shell", "edit", "write", "patch"]

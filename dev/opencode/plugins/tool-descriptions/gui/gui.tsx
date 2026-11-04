@@ -1,5 +1,5 @@
-// The GUI part (built into ../dist/gui-experimental.cjs), which the desktop
-// app loads.
+// The GUI part (built into ../dist/gui-experimental.cjs): the desktop app loads
+// it, and OpenCode Web through the web-gui plugin.
 import { onCleanup } from "solid-js"
 import { Plugin, Style } from "@opencode/plugin/gui"
 import { CSS, start } from "./timeline"

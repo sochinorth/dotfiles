@@ -56,7 +56,7 @@ restart = "on-failure"
 "~/.config/zsh/conf.d/dev.zsh" = { source = "dev/zsh/dev.zsh", mode = "symlink" }
 # OpenCode: the global config, instructions and plugins (codex.sale's live
 # models, Claude's entrypoint environment, Claude transcript cleanup, session
-# scratchpads, tool-call descriptions) are edited
+# scratchpads, tool-call descriptions, GUI plugins in the web app) are edited
 # in place. cli.json is the TUI's to write (theme,
 # settings), only seeded. Credentials, sessions and model picks live in its
 # database (~/.local/share/opencode), not tracked; /connect them again.
@@ -66,6 +66,7 @@ restart = "on-failure"
 "~/.config/opencode/plugins/claude-transcripts" = { source = "dev/opencode/plugins/claude-transcripts", mode = "symlink" }
 "~/.config/opencode/plugins/scratchpad" = { source = "dev/opencode/plugins/scratchpad", mode = "symlink" }
 "~/.config/opencode/plugins/tool-descriptions" = { source = "dev/opencode/plugins/tool-descriptions", mode = "symlink" }
+"~/.config/opencode/plugins/web-gui" = { source = "dev/opencode/plugins/web-gui", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
 # Global instructions; OpenCode passes them to every provider, Claude Agent included.
 "~/.config/opencode/AGENTS.md" = { source = "dev/opencode/AGENTS.md", mode = "symlink" }
