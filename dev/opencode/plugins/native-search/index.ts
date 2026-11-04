@@ -5,9 +5,11 @@
 // included). As their own clients do, the summary comes once, each paragraph under
 // the first source it cites; anthropic adds Claude's other result links (Claude
 // Code), openai only cited ones (Codex).
-// Selecting one is config's job (websearch.provider), which a Console workspace's
-// own choice would otherwise override.
-// Options: openai { model: "gpt-6-luna", effort: "low" }, anthropic { model: "haiku" }
+// A third, native, picks by the model searching: Claude Agent's use anthropic,
+// OpenAI's openai, others the fallback. Selecting it is config's job
+// (websearch.provider), which a Console workspace's own choice would otherwise override.
+// Options: fallback (a provider ID, "openai"), openai { model: "gpt-6-luna",
+// effort: "low" }, anthropic { model: "haiku" }
 import { spawn } from "node:child_process"
 import { once } from "node:events"
 import { homedir } from "node:os"
@@ -19,6 +21,8 @@ type Result = { url: string; title?: string; content?: string; time: {} }
 
 const TIMEOUT = 120_000
 const MAX_BYTES = 16 << 20
+// Model provider -> search provider for native; others get the fallback.
+const PIN: Record<string, string> = { "claude-agent": "anthropic", openai: "openai" }
 // OpenCode's ChatGPT login methods for the openai integration.
 const CHATGPT = new Set(["chatgpt-browser", "chatgpt-headless", "chatgpt-token-sharing"])
 const INSTRUCTIONS =
@@ -87,6 +91,7 @@ export default Plugin.define({
 		const openaiModel = option("openai.model", opts.openai?.model, text, "gpt-6-luna")
 		const openaiEffort = option("openai.effort", opts.openai?.effort, text, "low")
 		const anthropicModel = option("anthropic.model", opts.anthropic?.model, text, "haiku")
+		const fallback = option("fallback", opts.fallback, (v) => text(v) && v !== "native", "openai")
 		// Unloading aborts searches in flight, killing their claude.
 		const lifetime = new AbortController()
 
@@ -190,8 +195,37 @@ export default Plugin.define({
 			}
 		}
 
+		// A provider learns only the query, so native matches it to the websearch call
+		// about to run, whose session's agent loop last used `models`' provider.
+		const models = new Map<string, string>()
+		const pending: { id: string; query: unknown; search?: string }[] = []
+		await ctx.session.hook("context", ({ sessionID, model }) => {
+			models.delete(sessionID) // re-inserted last, so the oldest go first
+			models.set(sessionID, model.providerID)
+			if (models.size > 1000) models.delete(models.keys().next().value!)
+		})
+		await ctx.tool.hook("execute.before", ({ tool, id, sessionID, input }) => {
+			if (tool !== "websearch") return
+			pending.push({ id, query: (input as any)?.query, search: PIN[models.get(sessionID) ?? ""] })
+			// Bounded even if execute.after never comes; not by age, as a call can wait long on permission.
+			if (pending.length > 100) pending.shift()
+		})
+		// Drops calls that never reached a provider, e.g. denied ones.
+		await ctx.tool.hook("execute.after", ({ id }) => {
+			const i = pending.findIndex((p) => p.id === id)
+			if (i >= 0) pending.splice(i, 1)
+		})
+		const native = async (query: string, signal: AbortSignal) => {
+			const i = pending.findIndex((p) => p.query === query)
+			const search = (i >= 0 && pending.splice(i, 1)[0].search) || fallback
+			if (search === "openai") return openai(query, signal)
+			if (search === "anthropic") return anthropic(query, signal)
+			return (await ctx.websearch.query({ query, providerID: search }, { signal })).data.results
+		}
+
 		await ctx.websearch.transform((editor) => {
 			for (const [id, name, search] of [
+				["native", "Native (Claude Agent: anthropic, OpenAI: openai)", native],
 				["openai", "OpenAI (native)", openai],
 				["anthropic", "Anthropic (native, via Claude Code)", anthropic],
 			] as const)
