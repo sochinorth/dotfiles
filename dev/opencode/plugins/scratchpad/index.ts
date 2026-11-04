@@ -1,39 +1,58 @@
-// A scratchpad per session: a directory that lasts exactly as long as the session.
-//
-// OpenCode itself only offers /tmp/opencode, one directory for every session,
-// which the system's /tmp cleaner ages out. Here each session gets
-// $XDG_STATE_HOME/opencode/scratchpad/<sessionID>/. Its subagents share it (they're
-// deleted with it), a fork starts with a copy of its source's, and it's deleted
-// with its session (at load too, for sessions deleted while this wasn't running).
-//
-// The model learns the path from a session instruction entry (`scratchpad`).
-// Unlike system prompt edits, those reach Claude Agent sessions too: that provider
-// replaces OpenCode's environment block with Claude Code's own, which names
-// another scratchpad, so the entry says this one replaces it. For the other
-// providers, the environment block's hint to prefer /tmp/opencode is removed.
-//
+// Scratchpads live under $XDG_STATE_HOME/opencode/scratchpad:
+//   -home-me-repo/             project workflow state, kept
+//   -home-me-repo/<sessionID>/ session output, deleted with its owner
+// A worktree is its own project. Subagents share their root session's directory;
+// forks copy their source's. Flat session directories migrate on first use.
+// The model learns the paths from session instruction entries, which reach Claude
+// Agent too (its own Claude Code scratchpad is off: plugins/claude-entrypoint).
 // Edits need `opencode service restart`.
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs"
-import { readdir } from "node:fs/promises"
+import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { Plugin } from "@opencode/plugin"
 
-const KEY = "scratchpad"
-const LOG = "scratchpad:"
 const ROOT = join(process.env.XDG_STATE_HOME || join(homedir(), ".local", "state"), "opencode", "scratchpad")
-// OpenCode's environment block: "Prefer /tmp/opencode over generic system temporary
-// directories such as /tmp; it is pre-created and approved for external access."
-const TMP_HINT = /^[ \t]*Prefer \S+ over generic system temporary directories\b.*\n?/m
+const KEY = "scratchpad"
+const PATHS_KEY = "scratchpad-paths"
+const PRIVATE = 0o700
+// OpenCode validates only the "ses" prefix; IDs used as paths need more.
 const SESSION_ID = /^ses_[A-Za-z0-9]+$/
-
-// plugins run in process, where a failed call rejects with the tagged error itself
+const MAPPING = /^Earlier messages' paths under (.+) now mean the same paths under (.+)\.$/
+// OpenCode's environment block (not Claude Agent's): "Prefer /tmp/opencode over
+// generic system temporary directories such as /tmp; ..."
+const TMP_HINT = /^[ \t]*Prefer \S+ over generic system temporary directories\b.*\n?/m
 const notFound = (e: any) => e?._tag === "Session.NotFoundError"
 
-// Plugin instances in other locations share the process: share what they know.
-const state: { ready: Map<string, Promise<string | void>>; queue?: Promise<void> } = ((globalThis as any)[Symbol.for("sochinorth.scratchpad")] ??= { ready: new Map() })
+// All plugin locations share one process. Serialize filesystem changes, cache
+// invalidation and instruction writes together so a move cannot race preparation.
+const state: { dirs: Map<string, string>; queue?: Promise<void> } = ((globalThis as any)[Symbol.for("sochinorth.scratchpad")] ??= { dirs: new Map() })
 
-// the root of sessionID's subagent tree, whose scratchpad it uses
+function enqueue(label: string, task: () => unknown) {
+	state.queue = Promise.resolve(state.queue).then(task).then(() => {}, (e) => console.error("scratchpad:", label, e))
+	return state.queue
+}
+
+function slug(dir: string) {
+	const s = dir.replace(/[^a-zA-Z0-9]/g, "-")
+	return s.length <= 200 ? s : `${s.slice(0, 200)}-${createHash("sha256").update(dir).digest("hex").slice(0, 12)}`
+}
+
+function list(dir: string) {
+	try {
+		// Cleanup must not descend through project symlinks into unrelated data.
+		return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+	} catch {
+		return []
+	}
+}
+const projects = () => list(ROOT).filter((name) => name.startsWith("-"))
+
+function locate(sessionID: string) {
+	if (!SESSION_ID.test(sessionID)) return []
+	return [...projects(), ""].map((p) => join(ROOT, p, sessionID)).filter((dir) => existsSync(dir))
+}
+
 async function owner(ctx: Plugin.Context, sessionID: string) {
 	const seen = new Set<string>()
 	let info = await ctx.session.get({ sessionID })
@@ -42,71 +61,99 @@ async function owner(ctx: Plugin.Context, sessionID: string) {
 		seen.add(info.id)
 		info = await ctx.session.get({ sessionID: info.parentID })
 	}
-	// session IDs are only checked for their "ses" prefix; this one becomes a path
 	if (!SESSION_ID.test(info.id)) throw new Error(`unexpected session ID ${JSON.stringify(info.id)}`)
 	return info
 }
 
-// resolves to the scratchpad's path
-async function ensure(ctx: Plugin.Context, sessionID: string) {
-	const root = await owner(ctx, sessionID)
-	const dir = join(ROOT, root.id)
-	// a fork of a subagent forks the scratchpad that subagent used
-	const from = root.fork && (await owner(ctx, root.fork.sessionID).then((s) => join(ROOT, s.id), (e) => (notFound(e) ? undefined : Promise.reject(e))))
-	const source = from && existsSync(from) ? from : undefined
-	if (!existsSync(dir))
-		try {
-			if (source) cpSync(source, dir, { recursive: true, verbatimSymlinks: true })
-			else mkdirSync(dir, { recursive: true })
-		} catch (e) {
-			rmSync(dir, { recursive: true, force: true })
-			throw e
-		}
-	const subagent = root.id !== sessionID
-	const text = [
-		`Your scratchpad: ${dir}`,
-		subagent
-			? "It belongs to the session that started you, shared with its subagents, and lasts as long as that session."
-			: "It belongs to this session, shared with its subagents, and lasts as long as the session: it survives restarts and compaction, and is deleted with it.",
-		"Use it in place of /tmp, /tmp/opencode, or any other scratchpad or temporary directory named elsewhere.",
-		...(source && !subagent
-			? [`This session is a fork: it started with a copy of ${source}, so earlier messages' paths under that directory now mean the same paths under this one.`]
-			: []),
-	].join("\n")
-	const entries = await ctx.session.instructions.entry.list({ sessionID })
-	if (entries.find((e) => e.key === KEY)?.value !== text) await ctx.session.instructions.entry.put({ sessionID, key: KEY, value: text })
-	return dir
+// Read an entry, or replace it only when its value changes.
+async function entry(ctx: Plugin.Context, sessionID: string, key: string, value?: string) {
+	const old = (await ctx.session.instructions.entry.list({ sessionID })).find((e) => e.key === key)?.value
+	if (value === undefined) return typeof old === "string" ? old : ""
+	if (old !== value) await ctx.session.instructions.entry.put({ sessionID, key, value })
+	return value
+}
+
+// Keep historical paths pointing at the contents, including through chained
+// moves and forks. A fork reads its source's mappings only when copying files.
+async function remap(ctx: Plugin.Context, sessionID: string, from: string, to: string, sourceID = sessionID) {
+	const pairs = (await entry(ctx, sourceID, PATHS_KEY)).split("\n").flatMap((line) => {
+		const m = MAPPING.exec(line)
+		return m ? [[m[1], m[2] === from ? to : m[2]]] : []
+	})
+	pairs.push([from, to])
+	await entry(ctx, sessionID, PATHS_KEY, [...new Set(pairs.map(([a, b]) => `Earlier messages' paths under ${a} now mean the same paths under ${b}.`))].join("\n"))
+}
+
+function copy(from: string | undefined, to: string) {
+	try {
+		if (from) cpSync(from, to, { recursive: true, verbatimSymlinks: true })
+		else mkdirSync(to, { mode: PRIVATE })
+	} catch (e) {
+		rmSync(to, { recursive: true, force: true })
+		throw e
+	}
+}
+
+function move(from: string, to: string) {
+	try {
+		renameSync(from, to)
+	} catch (e: any) {
+		if (e?.code !== "EXDEV") throw e
+		copy(from, to)
+		rmSync(from, { recursive: true, force: true })
+	}
 }
 
 function prepare(ctx: Plugin.Context, sessionID: string) {
-	let ready = state.ready.get(sessionID)
-	if (!ready) {
-		ready = ensure(ctx, sessionID).catch((e) => {
-			state.ready.delete(sessionID)
-			console.error(LOG, sessionID, e)
-		})
-		state.ready.set(sessionID, ready)
-	}
-	// remade if something deleted it while its session lives
-	return ready
-		.then((dir) => {
-			if (dir && !existsSync(dir)) mkdirSync(dir, { recursive: true })
-		})
-		.catch((e) => console.error(LOG, sessionID, e))
+	return enqueue(sessionID, async () => {
+		const cached = state.dirs.get(sessionID)
+		if (cached) {
+			if (!existsSync(cached)) mkdirSync(cached, { recursive: true, mode: PRIVATE })
+			return
+		}
+		const root = await owner(ctx, sessionID)
+		const project = join(ROOT, slug(root.location.directory))
+		const dir = join(project, root.id)
+		if (!existsSync(dir)) {
+			mkdirSync(project, { recursive: true, mode: PRIVATE })
+			const old = locate(root.id)[0]
+			// A fork of a subagent copies the root session's shared scratchpad.
+			const source = !old && root.fork
+				? await owner(ctx, root.fork.sessionID).catch((e) => (notFound(e) ? undefined : Promise.reject(e)))
+				: undefined
+			const sourceDir = source && locate(source.id)[0]
+			// Publish before changing files: failed writes leave the source intact
+			// and the next preparation retries both operations.
+			if (old) await remap(ctx, root.id, old, dir)
+			else if (source && sourceDir) await remap(ctx, root.id, sourceDir, dir, source.id)
+			if (old) move(old, dir)
+			else copy(sourceDir, dir)
+		}
+		const subagent = root.id !== sessionID
+		const mappings = subagent && (await entry(ctx, root.id, PATHS_KEY))
+		if (mappings) await entry(ctx, sessionID, PATHS_KEY, mappings)
+		await entry(ctx, sessionID, KEY, [
+			`Project scratchpad: ${project}`,
+			`Session scratchpad: ${dir}`,
+			"The project scratchpad holds workflow state for work in this directory and outlives sessions, so later sessions and other models find it.",
+			`The session scratchpad belongs to ${subagent ? "the session that started you" : "this session"}, is shared with its subagents, survives restarts and compaction, and is deleted with its owner.`,
+			"Use them in place of /tmp, /tmp/opencode, or any other scratchpad or temporary directory named elsewhere.",
+		].join("\n"))
+		state.dirs.set(sessionID, dir)
+	})
 }
 
-// scratchpads of sessions OpenCode reports as not found; any other answer keeps one
+// Only confirmed-missing sessions are removed; project/task directories survive.
 async function sweep(ctx: Plugin.Context, only?: string) {
-	for (const id of only ? [only] : await readdir(ROOT).catch(() => [])) {
-		if (!SESSION_ID.test(id) || !existsSync(join(ROOT, id))) continue
+	const dirs = only ? locate(only) : [...projects(), ""].flatMap((p) => list(join(ROOT, p)).map((id) => join(ROOT, p, id)))
+	for (const dir of dirs) {
+		const id = basename(dir)
+		if (!SESSION_ID.test(id) || !existsSync(dir)) continue
 		try {
 			await ctx.session.get({ sessionID: id })
 		} catch (e) {
-			if (!notFound(e)) console.error(LOG, `keeping ${id}:`, e)
-			else {
-				rmSync(join(ROOT, id), { recursive: true, force: true })
-				state.ready.delete(id)
-			}
+			if (notFound(e)) rmSync(dir, { recursive: true, force: true })
+			else console.error("scratchpad:", `keeping ${dir}:`, e)
 		}
 	}
 }
@@ -114,31 +161,28 @@ async function sweep(ctx: Plugin.Context, only?: string) {
 export default Plugin.define({
 	id: "sochinorth.scratchpad",
 	async setup(ctx) {
-		const run = (only?: string) => {
-			state.queue = Promise.resolve(state.queue).then(() => sweep(ctx, only)).catch((e) => console.error(LOG, e))
-		}
-		// once per process
-		if (!state.queue) run()
-
-		// before a prompt is admitted, so the first step already sees the entry
+		if (!state.queue) void enqueue("sweep", () => sweep(ctx))
 		await ctx.session.hook("prompt", (event) => prepare(ctx, event.sessionID))
 		await ctx.session.hook("context", (event) => {
-			// sessions that start without a prompt (some subagents) get it from their next step
+			// Context-only starts get their entries at the next step boundary.
 			void prepare(ctx, event.sessionID)
 			event.system.forEach((part, i) => {
 				const text = part.text.replace(TMP_HINT, "")
 				if (text !== part.text) event.system[i] = { ...part, text }
 			})
 		})
-
 		const controller = new AbortController()
 		void (async () => {
-			for await (const event of ctx.event.subscribe({ types: ["session.deleted"], signal: controller.signal })) {
-				// subagents' entries too: the sweep only sees owners' directories
-				state.ready.delete(event.data.sessionID)
-				run(event.data.sessionID)
+			for await (const event of ctx.event.subscribe({ types: ["session.deleted", "session.moved"], signal: controller.signal })) {
+				void enqueue(event.type, () => {
+					if (event.type === "session.moved") state.dirs.clear()
+					else {
+						state.dirs.delete(event.data.sessionID)
+						return sweep(ctx, event.data.sessionID)
+					}
+				})
 			}
-		})().catch((e) => console.error(LOG, e))
+		})().catch((e) => console.error("scratchpad:", e))
 		return () => controller.abort()
 	},
 })
