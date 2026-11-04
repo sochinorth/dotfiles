@@ -1,5 +1,6 @@
-// Compaction as a three-level tree; these are its lower two levels, kept
-// for the checkpoint above them:
+// Compaction as a three-level tree:
+//   1. the checkpoint, what a compaction leaves in context: an index of what
+//      can't be searched for and grep keys into the rest (checkpoint.ts);
 //   2. the session's log, every message, large tool outputs as pointers;
 //   3. those outputs, whole (2 and 3: transcript.ts, in the session scratchpad,
 //      which plugins/scratchpad deletes with the session).
@@ -14,6 +15,7 @@
 //
 // Edits need `opencode service restart`.
 import { Plugin } from "@opencode/plugin"
+import { checkpoint } from "./checkpoint"
 import { transcript } from "./transcript"
 
 export default Plugin.define({
@@ -23,5 +25,6 @@ export default Plugin.define({
 		await ctx.session.hook("context", (event) => t.sync(event.sessionID))
 		// a turn's last reply, logged without waiting for the next request
 		await ctx.session.hook("experimental.idle", (event) => t.sync(event.sessionID))
+		return checkpoint(ctx, t)
 	},
 })
