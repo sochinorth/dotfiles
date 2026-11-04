@@ -7,6 +7,8 @@
 // limits and variants from OpenCode's own catalog (models.dev), under the
 // provider that owns it first; IDs the catalog doesn't know get OpenCode's
 // defaults. Prices are left out: they're codex.sale's, not the catalog's.
+// Image models (gpt-image-*) are offered too, as image models for
+// experimental_image_generate; other non-chat models are left out.
 //
 // Refreshes when the credential changes and every 6 hours. The last list is
 // stored with the connection it came from, so the models are there at startup
@@ -32,6 +34,11 @@ const CATALOG = new Map<string, string[]>([
 ])
 // The catalog files some non-chat models (e.g. gpt-4o-transcribe) under chat.
 const NOT_CHAT = /image|transcribe|tts|whisper|embed|realtime|moderation/
+// Image models, by type, or by name when the catalog doesn't know the ID. They
+// go through OpenAI's Images API (/images/generations, /images/edits), which
+// codex.sale serves too.
+const IMAGE = /^(gpt-image|chatgpt-image|dall-e)/
+const IMAGES_PACKAGE = "@opencode/ai/providers/openai/images"
 
 // API or cached data: keep the first entry per nonempty string id, in order.
 const parse = (data: unknown) => {
@@ -72,8 +79,11 @@ export default Plugin.define({
 			// compact natively, which codex.sale passes through (plugins/compaction
 			// turns it on). Over HTTP, as the generic route ran.
 			package: "@opencode/ai/providers/openai/responses",
-			settings: { baseURL, transport: "http", reasoningEffort: "medium", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] },
+			settings: { baseURL, transport: "http" },
 		}
+		// Per chat model rather than on the provider: provider settings reach image
+		// models too, and the Images route sends them as request body fields.
+		const responses = { reasoningEffort: "medium", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] }
 
 		// One stored value keeps list/source paired; ignore lists without provenance.
 		type Connection = Awaited<ReturnType<typeof ctx.integration.connection.active>>
@@ -128,10 +138,18 @@ export default Plugin.define({
 				if (!owners.includes("*") && !owners.includes(owner)) continue
 				const known = [...(CATALOG.get(owner) ?? []).map((p) => editor.get(p)), ...editor.list()]
 					.find((r) => r?.models.has(id))?.models.get(id)
-				if (NOT_CHAT.test(id) || (known?.type ?? "chat") !== "chat") continue
+				const type = known?.type ?? (IMAGE.test(id) ? "image" : "chat")
 				const base: Model.Info = Model.Info.default(providerID, Model.ID.make(id))
 				const { name, family, capabilities, variants, time, status, limit } = known ?? base
-				models.push({ ...base, name, family, capabilities, variants, time, status, limit })
+				if (type === "image")
+					// The package is set here, not taken from the catalog: the entry found
+					// may be another host's (Azure's, an openai-compatible gateway's).
+					models.push({
+						...base, type, package: IMAGES_PACKAGE, name, family, time, status, limit, variants: [],
+						capabilities: known ? capabilities : { tools: false, input: ["text", "image"], output: ["image"], temperature: false },
+					})
+				else if (type === "chat" && !NOT_CHAT.test(id))
+					models.push({ ...base, name, family, capabilities, variants, time, status, limit, settings: responses })
 			}
 			// Preserve a configured provider, but bind its inventory too.
 			editor.add({ info: editor.get(PROVIDER)?.provider ?? info, models, sourceConnection: source })
