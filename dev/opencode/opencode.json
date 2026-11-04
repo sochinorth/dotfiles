@@ -2,6 +2,12 @@
   "$schema": "https://opencode.ai/config.json",
   "plugins": ["-opencode.provider.openai-context-caps"],
   "websearch": { "provider": "native" },
+  "experimental": { "subagent_depth": 2 },
+  "agents": {
+    "general": {
+      "permissions": [{ "action": "subagent", "resource": "*", "effect": "allow" }]
+    }
+  },
   "providers": {
     "openai": {
       "body": {
