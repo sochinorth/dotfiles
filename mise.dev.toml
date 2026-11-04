@@ -62,6 +62,11 @@ restart = "on-failure"
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
 "~/.config/opencode/plugins/claude-entrypoint" = { source = "dev/opencode/plugins/claude-entrypoint", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
+# Global agent instructions, one file for both agents (OpenCode passes it to
+# every provider, Claude Agent included). Its .wip/ is ignored by
+# ~/.config/git/ignore (mise.toml).
+"~/.config/opencode/AGENTS.md" = { source = "dev/agents/AGENTS.md", mode = "symlink" }
+"~/.pi/agent/AGENTS.md" = { source = "dev/agents/AGENTS.md", mode = "symlink" }
 # IDASQL: OpenCode uses each skill directory's basename as its ID, not the
 # grouping directory or frontmatter name. Prefix the links to avoid collisions;
 # keep upstream files and their relative reference paths intact.

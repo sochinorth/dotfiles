@@ -1,0 +1,5 @@
+# Global excludes (git reads ~/.config/git/ignore when core.excludesFile is unset).
+
+# Coding agents' workflow state: plans, logs, manifests for the task in flight
+# (dev/agents/AGENTS.md). Never project content.
+.wip/
