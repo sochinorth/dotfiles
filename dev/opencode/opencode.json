@@ -1,6 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": ["-opencode.provider.openai-context-caps"],
+  "providers": {
+    "openai": {
+      "body": {
+        "reasoning": { "summary": "detailed" }
+      }
+    }
+  },
   "policies": [
     { "action": "skill.use", "resource": "built-in-browser", "effect": "deny" },
     { "action": "skill.use", "resource": "chrome-browser", "effect": "deny" },
