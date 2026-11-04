@@ -2,8 +2,8 @@
 // - a shell call's `description` goes on its header line, after "Shell" and
 //   before the dimmed command; the chevron that opens the output stays visible;
 // - file changes (edit, write, patch; consecutive ones are one block) fold
-//   under a header line of their own, "Edit  <description>", that opens on a
-//   click into the usual file rows;
+//   under a header line of their own, "Edit  <description>" ("Write", or
+//   "Edits" for a mix), that opens on a click or key into the usual file rows;
 // - a Thought whose summary fits on its header line shows it there, after
 //   "Thought 5s", with no dropdown; a longer one stays as the app shows it,
 //   unfolded with its arrow to fold. This needs the summary rendered, i.e.
@@ -19,103 +19,83 @@
 
 export type Session = {
 	id: string
-	// the app's synced messages of the session, as the timeline renders them
 	local(): any[]
-	// the session's assistant messages from the server, newest first: for
-	// calls not synced (yet)
 	messages(cursor?: string): Promise<{ data: any[]; cursor: { next?: string | null } }>
 }
+type Call = { name: string; description: string }
 
-const MARK = "data-tool-descriptions" // on every element we insert
-const FOLD = "data-tool-descriptions-fold" // on a file-change block we fold
-const OPEN = "data-tool-descriptions-open" // ... while unfolded
-const ONELINE = "data-tool-descriptions-oneline" // on a Thought shown inline
-
-// a patch reads as an edit: its row can't be told from one before it's looked up
+const MARK = "data-tool-descriptions"
+const FOLD = `${MARK}-fold`
+const OPEN = `${MARK}-open`
+const ONELINE = `${MARK}-oneline`
+const MAIN = "[data-slot=basic-tool-tool-info-main]"
+const TITLE = "[data-slot=basic-tool-tool-title]"
+const TRIGGER = "[data-slot=collapsible-trigger]"
+const TEXT = `[${MARK}=text]`
 const LABEL: Record<string, string> = { edit: "Edit", write: "Write", patch: "Edit" }
+const rowKey = (row: HTMLElement) => row.dataset.timelinePartId ?? row.dataset.timelinePartIds
+const FILE_ROWS = "[data-component=edit-tool], [data-component=write-tool], [data-component=apply-patch-tool]"
+const shownFiles = (row: Element) => [...new Set(
+	[...row.querySelectorAll("[data-slot=apply-patch-filename]")].map((e) => e.textContent?.trim()).filter(Boolean),
+)].join(", ")
 
 export const CSS = `
-/* the tool's name stays the row's title; the description reads like a Thought's summary */
-[${MARK}=text],
-[${MARK}=thought],
-[data-slot=basic-tool-tool-info-main] > [${MARK}=text] ~ * {
+${TEXT}, [${MARK}=thought], ${MAIN} > ${TEXT} ~ * {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-[${MARK}=text],
-[${MARK}=thought] {
+${TEXT}, [${MARK}=thought] {
 	color: var(--v2-text-text-muted);
 	font-weight: var(--font-weight-regular);
 }
-[${MARK}=text] {
-	font-size: 13px;
-}
-/* opened, a row shows its description in full, wrapped */
-[${OPEN}] > [${MARK}=header] [${MARK}=text],
-[data-slot=collapsible-trigger][aria-expanded=true] [${MARK}=text] {
+[${OPEN}] > [${MARK}=header] ${TEXT}, ${TRIGGER}[aria-expanded=true] ${TEXT} {
 	white-space: normal;
 	overflow: visible;
 }
-[data-slot=collapsible-trigger][aria-expanded=true]:has([${MARK}=text]) {
+${TRIGGER}[aria-expanded=true]:has(${TEXT}) {
 	height: auto !important;
 	min-height: 28px;
 }
-/* on top of the row's 8px gap: apart from the command after it */
-[${MARK}=text]:not(:last-child) {
+${TEXT}:not(:last-child) {
 	margin-inline-end: 4px;
 }
-[data-slot=basic-tool-tool-info-main]:has(> [${MARK}=text]) {
+${MAIN}:has(> ${TEXT}) {
 	flex: 1 1 auto;
 }
-/* the description keeps its width; the command after it gets what's left */
-[data-slot=basic-tool-tool-info-main] > [${MARK}=text]:not(:last-child) {
-	flex: 0 1 auto;
+${MAIN} > ${TEXT}:not(:last-child) {
 	max-width: 80%;
 }
-[data-slot=basic-tool-tool-info-main] > [${MARK}=text] ~ * {
+${MAIN} > ${TEXT} ~ * {
 	flex: 1 1 0;
 	opacity: .55;
 }
-[data-component=tool-part-wrapper]:has([${MARK}=text]) [data-slot=collapsible-arrow] {
+[data-component=tool-part-wrapper]:has(${TEXT}) [data-slot=collapsible-arrow] {
 	opacity: 1;
 }
-/* "Thought" and its duration keep their width; the summary gets what's left */
-[data-slot=basic-tool-tool-info-main]:has(> [${MARK}=thought]) > :not([${MARK}]) {
+${MAIN}:has(> [${MARK}=thought]) > :not([${MARK}]) {
 	flex-shrink: 0;
 }
-/* An inline Thought is its header line alone, whether the app has it open or
-   closed (Thinking collapsed or not): nothing but the trigger shows, and
-   nothing in it takes a click, so it can't open onto blank space. */
-[${ONELINE}] [data-component=collapsible] > :not([data-slot=collapsible-trigger]),
-[${ONELINE}] [data-slot=collapsible-content],
+[${ONELINE}] [data-component=collapsible] > :not(${TRIGGER}),
 [${ONELINE}] [data-slot=collapsible-arrow],
-[data-component=reasoning-part]:not([${ONELINE}]) [${MARK}=thought] {
-	display: none !important;
-}
-[${ONELINE}] [data-component=collapsible],
-[${ONELINE}] [data-component=collapsible] * {
-	pointer-events: none !important;
-	cursor: default !important;
-}
+[data-component=reasoning-part]:not([${ONELINE}]) [${MARK}=thought],
 [${FOLD}]:not([${OPEN}]) > :not([${MARK}=header]) {
 	display: none !important;
 }
+[${ONELINE}] [data-component=collapsible], [${ONELINE}] [data-component=collapsible] * {
+	pointer-events: none !important;
+	cursor: default !important;
+}
 [${MARK}=header] {
-	cursor: pointer;
 	min-height: 28px;
 }
-/* spaced and lettered like the app's compact rows (Shell, Thought) */
-[${MARK}=header],
-[${MARK}=header] [data-slot=basic-tool-tool-info-main] {
+[${MARK}=header], [${MARK}=header] ${MAIN} {
 	gap: 6px;
 }
-[${MARK}=header] [data-slot=basic-tool-tool-title] {
+[${MARK}=header] ${TITLE} {
 	font-family: var(--v2-font-family-sans);
-	font-size: 13px;
 	font-weight: 530;
-	line-height: var(--line-height-compact);
 	letter-spacing: -.04px;
 }
 [${MARK}=chevron] {
@@ -130,8 +110,7 @@ export const CSS = `
 }
 `
 
-// a file-change block's header line, in the app's own tool-trigger markup so
-// it's styled like the rest
+// Use the app's trigger structure and typography; dynamic text never goes in HTML.
 const HEADER =
 	`<div ${MARK}=header data-component=tool-trigger data-clickable=true role=button tabindex=0>` +
 	`<div data-slot=basic-tool-tool-trigger-content><div data-slot=basic-tool-tool-info><div data-slot=basic-tool-tool-info-structured>` +
@@ -139,27 +118,30 @@ const HEADER =
 	`</div></div></div><span ${MARK}=chevron><svg width="16" height="16" viewBox="0 0 20 20" fill="none">` +
 	`<path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg></span></div>`
 
-type Call = { name: string; description: string }
-
 const mark = (kind: string) => {
 	const span = document.createElement("span")
 	span.setAttribute(MARK, kind)
 	return span
 }
-
-// only on a change: writing text is a mutation, which would schedule another pass
-const setText = (node: Element | null | undefined, text: string) => {
+// Rewriting unchanged text would schedule another observer pass.
+const setText = (node: Element | null, text: string) => {
 	if (node && node.textContent !== text) node.textContent = text
 }
+const inline = (part: Element, on: boolean) => {
+	part.toggleAttribute(ONELINE, on)
+	const button = part.querySelector<HTMLElement>(TRIGGER)
+	if (on) {
+		button?.setAttribute("tabindex", "-1")
+		if (button && button === document.activeElement) button.blur()
+	} else button?.removeAttribute("tabindex")
+}
 
-// A Thought's summary as one line: its blocks joined, a bold heading block
-// (OpenAI's "**Checking parity**") followed by a colon.
+// Innermost Markdown blocks, with a bold heading followed by a colon.
 const flatten = (markdown: Element) => {
-	let out = ""
-	let heading = false
-	// the app wraps paragraphs in its own block divs; take the innermost blocks
 	const BLOCK = "p, h1, h2, h3, h4, h5, h6, li, pre, blockquote"
 	const blocks = [...markdown.querySelectorAll(BLOCK)].filter((b) => !b.querySelector(BLOCK))
+	let out = ""
+	let heading = false
 	for (const block of blocks.length ? blocks : markdown.children) {
 		const text = block.textContent?.replace(/\s+/g, " ").trim()
 		if (!text) continue
@@ -170,108 +152,79 @@ const flatten = (markdown: Element) => {
 	}
 	return out
 }
-
-// the names of the files a file change touches: edit and write name one, a
-// patch names each in its "*** Update File: <path>" lines
 const files = (input: any) => {
-	const paths: string[] =
-		typeof input?.path === "string"
-			? [input.path]
-			: typeof input?.patchText === "string"
-				? [...input.patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map((m) => m[1].trim())
-				: []
-	return [...new Set(paths.map((p) => p.split("/").pop() || p))]
+	const paths: string[] = typeof input?.path === "string" ? [input.path]
+		: typeof input?.patchText === "string"
+			? [...input.patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map((m) => m[1].trim())
+			: []
+	return [...new Set(paths.map((p) => p.split("/").pop() || p))].join(", ")
+}
+// Streaming input is incomplete JSON. Only decode the complete leading string.
+const streamed = (json: string) => {
+	const m = /^\s*\{\s*"description"\s*:\s*("(?:[^"\\]|\\.)*")/.exec(json)
+	try {
+		return m ? { description: JSON.parse(m[1]) } : undefined
+	} catch {}
+}
+const resolve = (part: any) => {
+	const streaming = part.state?.status === "streaming"
+	const input = typeof part.state?.input === "string" ? streamed(part.state.input) : part.state?.input
+	const description = input?.description
+	if (typeof description === "string" && description && (part.name === "shell" || part.name in LABEL))
+		return { call: { name: part.name, description }, final: !streaming }
+	if (!streaming) {
+		const names = part.name in LABEL ? files(input) : ""
+		return { call: names ? { name: part.name, description: names } : null, final: true }
+	}
 }
 
-// the app's file-change rows, and the file names their headers show
-const FILE_ROWS = "[data-component=edit-tool], [data-component=write-tool], [data-component=apply-patch-tool]"
-const shownFiles = (row: Element) => [
-	...new Set([...row.querySelectorAll("[data-slot=apply-patch-filename]")].map((e) => e.textContent?.trim()).filter(Boolean)),
-]
-
-// Starts decorating the document; returns a function that stops and undoes it.
 export function start(current: () => Session | undefined) {
-	// tool call ID -> what it was; null once known to be no call we decorate
-	const calls = new Map<string, Call | null>()
+	// null: known non-decorated call; false: absent from this session's lookup.
+	const calls = new Map<string, Call | null | false>()
 	const wanted = new Set<string>()
-	const opened = new Set<string>() // file-change blocks unfolded, by their IDs
-	// Calls the shown session's messages lack. A row can outlast a switch of
-	// sessions by a frame, and be looked up in the wrong one; so these count as
-	// no call only until the session changes.
-	const absent = new Set<string>()
-	let shown: string | undefined // the session the lookups are for
+	const opened = new Set<string>()
+	let shown: string | undefined
+	let stopped = false
 	const follow = () => {
 		const id = current()?.id
 		if (id === shown) return
 		shown = id
 		wanted.clear()
-		for (const a of absent) calls.delete(a)
-		absent.clear()
+		calls.clear()
 	}
-	let stopped = false
-
-	// What a stored tool part makes of a row: its call (null: nothing to
-	// decorate), and whether that's final; undefined while its input is still
-	// coming without a description yet. A description streams in first, so a
-	// running call usually has it before its command.
-	const resolve = (part: any) => {
-		const streaming = part.state?.status === "streaming"
-		const description = part.state?.input?.description
-		if (typeof description === "string" && description && (part.name === "shell" || part.name in LABEL))
-			return { call: { name: part.name, description }, final: !streaming }
-		if (streaming) return
-		// a file change without one still folds, under its files' names
-		const names = part.name in LABEL ? files(part.state?.input) : []
-		return { call: names.length ? { name: part.name, description: names.join(", ") } : null, final: true }
-	}
-
-	// the app's own synced messages, indexed once per pass: the rows on screen
-	// render from them, so a row's call is there the moment it renders
-	let local: Map<string, unknown> | undefined
-	const localPart = (id: string) => {
-		if (!local) {
-			local = new Map()
-			for (const message of current()?.local() ?? [])
-				for (const part of message.content ?? []) if (part.type === "tool") local.set(part.id, part)
-		}
-		return local.get(id)
-	}
-
-	const lookup = (ids: string[]) => {
-		const found: Call[] = []
-		for (const id of ids) {
-			let call = calls.get(id)
-			if (call === undefined) {
-				const part = localPart(id)
-				const known = part ? resolve(part) : undefined
-				if (known?.final) calls.set(id, known.call)
-				if (known) call = known.call
-				else if (!part) wanted.add(id) // not synced (yet): ask the server
+	// Cache completed calls, not streamed input. Local messages supersede negative
+	// results: a previous server lookup may have beaten their arrival in the app.
+	let local: Map<string, any> | undefined
+	const lookup = (ids: string[]) => ids.flatMap((id) => {
+		let call = calls.get(id)
+		if (call === undefined || call === false) {
+			if (!local) {
+				local = new Map()
+				for (const message of current()?.local() ?? [])
+					for (const part of message.content ?? []) if (part.type === "tool") local.set(part.id, part)
 			}
-			if (call) found.push(call)
+			const part = local.get(id)
+			const known = part ? resolve(part) : undefined
+			if (known?.final) calls.set(id, known.call)
+			if (known) call = known.call
+			else if (!part && !calls.has(id)) wanted.add(id)
 		}
-		return found
+		return call ? [call] : []
+	})
+	const show = (row: HTMLElement, header: Element) => {
+		const open = opened.has(rowKey(row)!)
+		row.toggleAttribute(OPEN, open)
+		header.setAttribute("aria-expanded", String(open))
 	}
-
-	// every info-main but a subagent's starts with the title
-	const decorateShell = (row: HTMLElement, call: Call) => {
-		const title = row.querySelector(
-			"[data-component=tool-trigger] [data-slot=basic-tool-tool-info-main] > [data-slot=basic-tool-tool-title]",
-		)
-		if (!title) return
-		let span = title.parentElement!.querySelector(`:scope > [${MARK}=text]`)
-		if (!span) title.after((span = mark("text")))
-		setText(span, call.description)
-	}
-
-	const decorateFiles = (row: HTMLElement, key: string, found: Call[]) => {
+	const decorateFiles = (row: HTMLElement, found: Call[]) => {
 		let header = row.querySelector<HTMLElement>(`:scope > [${MARK}=header]`)
 		if (!header) {
 			row.insertAdjacentHTML("afterbegin", HEADER)
-			header = row.firstElementChild as HTMLElement
+			const h = (header = row.firstElementChild as HTMLElement)
 			const toggle = () => {
+				const key = rowKey(row)!
 				if (!opened.delete(key)) opened.add(key)
-				row.toggleAttribute(OPEN, opened.has(key))
+				show(row, h)
 			}
 			header.onclick = toggle
 			header.onkeydown = (e) => {
@@ -281,41 +234,39 @@ export function start(current: () => Session | undefined) {
 			}
 		}
 		row.toggleAttribute(FOLD, true)
-		row.toggleAttribute(OPEN, opened.has(key))
-		const one = found.every((c) => c.name === found[0].name)
-		setText(header.querySelector("[data-slot=basic-tool-tool-title]"), one ? LABEL[found[0].name] : "Edits")
-		setText(header.querySelector(`[${MARK}=text]`), found.map((c) => c.description).join("; "))
+		show(row, header)
+		setText(header.querySelector(TITLE), found.every((c) => c.name === found[0].name) ? LABEL[found[0].name] : "Edits")
+		setText(header.querySelector(TEXT), found.map((c) => c.description).join("; "))
 	}
-
 	const decorateTools = () => {
 		for (const row of document.querySelectorAll<HTMLElement>("[data-component=tool-part-wrapper]")) {
-			const key = row.dataset.timelinePartId ?? row.dataset.timelinePartIds
+			const key = rowKey(row)
 			if (!key) continue
 			const ids = key.split(",")
 			const found = lookup(ids)
-			// A file change folds the moment it renders, under the file names its
-			// rows show, until its calls are looked up: no flash of open diffs.
-			if (found.length === 0 && !ids.every((id) => calls.has(id)) && row.querySelector(FILE_ROWS)) {
-				const name = row.querySelector("[data-component=write-tool]") ? "write" : "edit"
-				decorateFiles(row, key, [{ name, description: shownFiles(row).join(", ") }])
-			} else if (found[0]?.name === "shell") decorateShell(row, found[0])
-			else if (found.length) decorateFiles(row, key, found)
+			// Fold immediately under rendered file names, before an unsynced lookup.
+			if (!found.length && !ids.every((id) => calls.has(id)) && row.querySelector(FILE_ROWS))
+				found.push({
+					name: row.querySelector("[data-component=write-tool]") ? "write" : "edit",
+					description: shownFiles(row),
+				})
+			if (found[0]?.name !== "shell") {
+				if (found.length) decorateFiles(row, found)
+				continue
+			}
+			const title = row.querySelector(`[data-component=tool-trigger] ${MAIN} > ${TITLE}`)
+			if (!title) continue
+			let span = title.parentElement!.querySelector(`:scope > ${TEXT}`)
+			if (!span) title.after((span = mark("text")))
+			setText(span, found[0].description)
 		}
 	}
 
-	// Each Thought's header line, with what it was last measured with: its text.
-	// Measuring lays the page out, so it's done again only when that text or the
-	// line's width changes.
 	const measured = new Map<Element, string>()
 	const resized = new ResizeObserver((entries) => {
-		for (const entry of entries) if (measured.has(entry.target)) measured.set(entry.target, "")
+		for (const e of entries) if (measured.has(e.target)) measured.set(e.target, "")
 		schedule()
 	})
-
-	// A Thought whose summary fits on its header line shows it there, with no
-	// dropdown; one that doesn't is left to the app (shown in full, with the
-	// app's arrow to fold it). Fitting is measured with the summary in place,
-	// within one task, so the trial layout is never painted.
 	const decorateThoughts = () => {
 		for (const [trigger] of measured)
 			if (!trigger.isConnected) {
@@ -324,36 +275,34 @@ export function start(current: () => Session | undefined) {
 			}
 		for (const part of document.querySelectorAll("[data-component=reasoning-part]")) {
 			const trigger = part.querySelector("[data-component=tool-trigger]")
-			const main = trigger?.querySelector("[data-slot=basic-tool-tool-info-main]")
+			const main = trigger?.querySelector(MAIN)
 			const markdown = part.querySelector("[data-slot=collapsible-content] [data-component=markdown]")
 			const text = markdown ? flatten(markdown) : ""
 			let span = main?.querySelector(`:scope > [${MARK}=thought]`)
 			if (!trigger || !main || !text) {
 				span?.remove()
-				part.removeAttribute(ONELINE)
+				inline(part, false)
 				if (trigger && measured.has(trigger)) measured.set(trigger, "")
 				continue
 			}
 			span ??= main.appendChild(mark("thought"))
 			setText(span, text)
-			// the line's text, "Thought 5s" and all: a longer duration takes room too
-			const line = trigger.textContent ?? ""
+			const line = trigger.textContent ?? "" // duration takes room too
 			if (measured.get(trigger) === line) continue
 			if (!measured.has(trigger)) resized.observe(trigger)
 			measured.set(trigger, line)
+			// Trial layout is never painted; remeasure only on text or size changes.
 			part.toggleAttribute(ONELINE, true)
-			part.toggleAttribute(ONELINE, span.scrollWidth <= span.clientWidth + 1)
+			inline(part, span.scrollWidth <= span.clientWidth + 1)
 		}
 	}
 
-	// Look the wanted calls up in the session's messages. One still being
-	// written is asked about again, at most once a second.
 	let fetching = false
 	let last = 0
 	let retry: ReturnType<typeof setTimeout> | undefined
 	const fetchWanted = async () => {
 		const session = current()
-		if (!session || fetching || wanted.size === 0) return
+		if (!session || fetching || !wanted.size) return
 		const wait = last + 1000 - Date.now()
 		if (wait > 0) {
 			retry ??= setTimeout(() => {
@@ -368,31 +317,26 @@ export function start(current: () => Session | undefined) {
 		const pending = new Set<string>()
 		try {
 			let cursor: string | undefined
+			// Bound old/foreign row lookups. Local messages can supersede a miss.
 			for (let page = 0; page < 20 && asked.size > pending.size; page++) {
 				const res = await session.messages(cursor)
 				if (stopped) return
-				for (const message of res.data)
-					for (const part of message.content ?? []) {
-						if (part.type !== "tool" || !asked.has(part.id)) continue
-						const known = resolve(part)
-						if (!known?.final) pending.add(part.id)
-						else {
-							calls.set(part.id, known.call)
-							asked.delete(part.id)
-						}
+				for (const message of res.data) for (const part of message.content ?? []) {
+					if (part.type !== "tool" || !asked.has(part.id)) continue
+					const known = resolve(part)
+					// Unsynced streaming calls wait for completion, at most once a second.
+					if (!known?.final) pending.add(part.id)
+					else {
+						calls.set(part.id, known.call)
+						asked.delete(part.id)
 					}
+				}
 				cursor = res.cursor.next ?? undefined
 				if (!cursor) break
 			}
-			// not among this session's calls at all: not a row we decorate, while
-			// it's the session shown
 			follow()
 			if (session.id === shown)
-				for (const id of asked)
-					if (!pending.has(id)) {
-						calls.set(id, null)
-						absent.add(id)
-					}
+				for (const id of asked) if (!pending.has(id)) calls.set(id, false)
 			for (const id of wanted) if (calls.has(id)) wanted.delete(id)
 		} catch (e) {
 			console.error("tool-descriptions:", e)
@@ -402,7 +346,6 @@ export function start(current: () => Session | undefined) {
 		}
 		local = undefined
 		decorateTools()
-		// calls still being written, and rows that asked meanwhile
 		if (wanted.size) void fetchWanted()
 	}
 
@@ -419,13 +362,14 @@ export function start(current: () => Session | undefined) {
 	}
 	const observer = new MutationObserver(schedule)
 	observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-
+	schedule()
 	return () => {
 		stopped = true
 		observer.disconnect()
 		resized.disconnect()
 		if (frame !== undefined) cancelAnimationFrame(frame)
 		clearTimeout(retry)
+		document.querySelectorAll(`[${ONELINE}]`).forEach((e) => inline(e, false))
 		document.querySelectorAll(`[${MARK}]`).forEach((e) => e.remove())
 		for (const a of [FOLD, OPEN, ONELINE]) document.querySelectorAll(`[${a}]`).forEach((e) => e.removeAttribute(a))
 	}

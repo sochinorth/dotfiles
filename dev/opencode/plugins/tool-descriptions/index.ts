@@ -8,12 +8,8 @@
 // skipped. Compaction and generate requests (warming among them) send the
 // session's tools too, so they get the same schemas: a request whose tools
 // differ from the turns' misses their cached prompt prefix.
-//
-// The timeline half is the GUI part, gui/, built into dist/: the desktop app
-// loads it, and so does OpenCode Web opened through the web-gui proxy.
 import { Plugin } from "@opencode/plugin"
 
-const TOOLS = ["shell", "edit", "write", "patch"]
 const FIELD = {
 	type: "string",
 	description:
@@ -25,18 +21,15 @@ export default Plugin.define({
 	async setup(ctx) {
 		for (const hook of ["context", "compaction", "generate"] as const)
 			await ctx.session.hook(hook, ({ tools }) => {
-				for (const name of TOOLS) {
+				for (const name of ["shell", "edit", "write", "patch"]) {
 					const tool = tools[name]
 					if (!tool) continue
 					const { properties, required = [] } = tool.input as { properties?: object; required?: string[] }
-					tools[name] = {
-						...tool,
-						input: {
-							...tool.input,
-							// first, so it's written (and streamed) before a long command or patch
-							properties: { description: FIELD, ...properties },
-							required: [...new Set(["description", ...required])],
-						},
+					tool.input = {
+						...tool.input,
+						// First so the description streams before a long command or patch.
+						properties: { description: FIELD, ...properties },
+						required: [...new Set(["description", ...required])],
 					}
 				}
 			})
