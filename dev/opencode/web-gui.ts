@@ -19,17 +19,20 @@
 // If an update changes the entry script's shape, the patch is skipped (logged
 // once) and Web runs plain.
 //
-// Logins carry over from the service's own address: cookies don't depend on
-// the port. The proxy answers only to its loopback names (127.0.0.1,
-// localhost, [::1] on its port), so a page on another name resolved to
-// 127.0.0.1 (DNS rebinding) gets a 403. It gives the server's origin only to
-// its own pages' requests: any other Origin passes through as is, so the
-// server's cross-origin checks (CORS, the session cookie's origin check) hold
-// as if it were asked directly.
+// It logs in for the browser: every request goes upstream with the service's
+// password (from its service.json, where the CLI reads it too), so a page needs
+// no pairing. Reaching the proxy is then as good as holding the password, so it
+// serves only its own pages:
+// - only its loopback names as Host (127.0.0.1, localhost, [::1] on its port),
+//   so a page on another name resolved to 127.0.0.1 (DNS rebinding) gets a 403;
+// - no browser request from another origin (Origin) or site (Sec-Fetch-Site;
+//   other localhost ports are the same site): those get a 403 too.
+// Non-browser clients send neither header. Any process that can connect gets
+// in, which a process running as you could do with service.json anyway.
 //
-// It finds the service in its service.json, as the CLI does. When the service
-// isn't running, the proxy starts it through the dev.mise.opencode unit, so it
-// runs under systemd rather than under this unit or a terminal.
+// When the service isn't running, the proxy starts it through the
+// dev.mise.opencode unit, so it runs under systemd rather than under this unit
+// or a terminal.
 // Environment: WEB_GUI_PORT (44444).
 import { execFile } from "node:child_process"
 import { readFile } from "node:fs/promises"
@@ -73,10 +76,8 @@ const bridge = () => {
 		localStorage.setItem(KEY, JSON.stringify(list))
 		emit({ type: "installed", list })
 	}
-	// a password login's Authorization (see configure); a cookie login needs none
-	let auth: string | undefined
 	const read = async (path: string) => {
-		const res = await fetch(path, { credentials: "include", headers: auth ? { authorization: auth } : {} })
+		const res = await fetch(path)
 		if (!res.ok) throw new Error(`GET ${path}: HTTP ${res.status}`)
 		return res.json()
 	}
@@ -120,15 +121,8 @@ const bridge = () => {
 			},
 		},
 		packaged: false,
-		// the app's servers; plugins come from this page's one, which carries a
-		// password if the app logged in with one (sent as the app does)
-		configure(servers: { url: string; password?: string }[]) {
-			const password = servers.find((s) => s.url.replace(/\/$/, "") === location.origin)?.password
-			const next = password === undefined ? undefined : `Basic ${btoa(`opencode:${password}`)}`
-			if (next === auth) return
-			auth = next
-			void refresh().catch(() => {})
-		},
+		// which servers' plugins to load: always this page's, which the proxy logs in to
+		configure() {},
 		runMenubarItem() {},
 		subscribe: async () => ({ available: false }),
 		call: async () => {
@@ -137,7 +131,7 @@ const bridge = () => {
 	}
 }
 
-type Service = { url: URL; pid: number }
+type Service = { url: URL; pid: number; auth?: string }
 
 const run = promisify(execFile)
 const readService = async (): Promise<Service | undefined> => {
@@ -148,10 +142,11 @@ const readService = async (): Promise<Service | undefined> => {
 		if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined
 		throw e
 	}
-	const s = JSON.parse(raw) as { url: string; pid: number }
+	const s = JSON.parse(raw) as { url: string; pid: number; password?: string }
 	const url = new URL(s.url)
 	if (url.protocol !== "http:") throw new Error(`the service isn't plain HTTP: ${s.url}`)
-	return { url, pid: s.pid }
+	const auth = s.password === undefined ? undefined : `Basic ${Buffer.from(`opencode:${s.password}`).toString("base64")}`
+	return { url, pid: s.pid, auth }
 }
 const alive = (pid: number) => {
 	try {
@@ -191,14 +186,22 @@ const patchHtml = (html: string) => html.replace(/<head[^>]*>/i, (head) => `${he
 const patchCsp = (csp: string) =>
 	/script-src[^;]*'unsafe-eval'/.test(csp) ? csp : csp.replace(/script-src/, "script-src 'unsafe-eval'")
 
-// the origins of this proxy's pages; any other Host gets a 403
+// the origins of this proxy's pages
 const origins = new Set(["127.0.0.1", "localhost", "[::1]"].map((name) => `http://${name}:${PORT}`))
-// the request as the server should see it: its own host, and its own origin
-// where it comes from this proxy's pages (other origins stay)
+// why a request isn't served, if it isn't: see the top
+const refuse = (headers: IncomingHttpHeaders, own: string) => {
+	if (!origins.has(own)) return "unknown Host"
+	if (headers.origin !== undefined && headers.origin !== own) return "cross-origin request"
+	const site = headers["sec-fetch-site"]
+	if (site !== undefined && site !== "same-origin" && site !== "none") return "cross-site request"
+}
+// the request as the server should see it: its own host and origin, and the
+// service's password
 const outgoing = (headers: IncomingHttpHeaders, s: Service, own: string) => {
 	const h: IncomingHttpHeaders = { ...headers, host: s.url.host }
-	if (h.origin === own) h.origin = s.url.origin
+	if (h.origin) h.origin = s.url.origin
 	if (h.referer?.startsWith(`${own}/`)) h.referer = s.url.origin + h.referer.slice(own.length)
+	if (s.auth) h.authorization = s.auth
 	return h
 }
 const stripHop = (headers: IncomingHttpHeaders) => {
@@ -209,7 +212,8 @@ const stripHop = (headers: IncomingHttpHeaders) => {
 const server = createServer(async (req, res) => {
 	const fail = (status: number, message: unknown) => res.writeHead(status, { "content-type": "text/plain" }).end(`web-gui: ${message}\n`)
 	const own = `http://${req.headers.host?.toLowerCase()}`
-	if (!origins.has(own)) return fail(403, "unknown Host")
+	const refused = refuse(req.headers, own)
+	if (refused) return fail(403, refused)
 	const path = req.url!.split("?")[0]
 	if (path === BRIDGE) return res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" }).end(`(${bridge})()\n`)
 	// a refused connection (a stale service.json) starts the service, and a
@@ -254,7 +258,7 @@ const server = createServer(async (req, res) => {
 server.on("upgrade", async (req, socket, head) => {
 	socket.on("error", () => socket.destroy())
 	const own = `http://${req.headers.host?.toLowerCase()}`
-	if (!origins.has(own)) return socket.end("HTTP/1.1 403 Forbidden\r\nconnection: close\r\ncontent-length: 0\r\n\r\n")
+	if (refuse(req.headers, own)) return socket.end("HTTP/1.1 403 Forbidden\r\nconnection: close\r\ncontent-length: 0\r\n\r\n")
 	const s = await service().catch(() => undefined)
 	if (!s || socket.destroyed) return socket.destroy()
 	const lines = Object.entries(outgoing(req.headers, s, own)).flatMap(([k, v]) => [v].flat().map((v) => `${k}: ${v}\r\n`))
