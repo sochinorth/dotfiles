@@ -13,13 +13,14 @@
 //     process has them open (a session's first turn is saved to its record only
 //     once the turn ends).
 // Transcripts from standalone `claude` (or from before the entrypoint tag) are
-// left alone unless a gone session's record names them.
+// left alone unless a gone session's record names them; a `claude` started in
+// an OpenCode terminal isn't standalone (see plugins/claude-entrypoint).
 //
 // That storage is private to the provider, so this reads OpenCode's database
 // directly. It deletes nothing, and logs why, if the record format changes or
-// the database isn't this server's (OpenCode names it by release channel): the
-// server must know the database's newest session, and a session is gone only
-// if both say so.
+// the database isn't this server's (OpenCode names it by release channel): a
+// value this plugin stores through the server must show up in it, and a
+// session is gone only if both say so.
 //
 // Every OpenCode running Claude shares the Claude dir, and one with another
 // database would see this one's transcripts as orphans. So orphans are only
@@ -34,16 +35,17 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { Plugin } from "@opencode/plugin"
 
+const PLUGIN = "sochinorth.claude-transcripts"
 const GRACE_MS = 60 * 60 * 1000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const LOG = "claude-transcripts:"
 const DATA = join(homedir(), ".local", "share")
 const CLAUDE = join(homedir(), ".claude")
-// plugin storage keys are `plugin:<id as UTF-16 hex>:<key>`
-const PREFIX = `plugin:${[..."opencode.provider.claude-agent"].map((c) => c.charCodeAt(0).toString(16).padStart(4, "0")).join("")}:sessions/`
-
-// server plugins get the in-process API, which rejects with the error itself
-const notFound = (e: any) => e?._tag === "Session.NotFoundError"
+// Plugin storage namespaces encode the plugin ID as UTF-16 hex.
+const storageKey = (plugin: string, key: string) =>
+	`plugin:${plugin.split("").map((c) => c.charCodeAt(0).toString(16).padStart(4, "0")).join("")}:${key}`
+const PREFIX = storageKey("opencode.provider.claude-agent", "sessions/")
+const PROBE = "database-probe"
 
 function ls(dir: string) {
 	try {
@@ -53,7 +55,6 @@ function ls(dir: string) {
 	}
 }
 
-// Claude session IDs that a running claude process holds
 function openSessions(dir: string) {
 	const open = new Set<string>()
 	for (const { name } of ls(dir)) {
@@ -63,7 +64,7 @@ function openSessions(dir: string) {
 			try {
 				process.kill(pid, 0)
 			} catch (e: any) {
-				if (e.code !== "EPERM") continue // EPERM: it exists, under another user
+				if (e.code !== "EPERM") continue // EPERM: alive, under another user
 			}
 			open.add(sessionId)
 		} catch {}
@@ -71,8 +72,7 @@ function openSessions(dir: string) {
 	return open
 }
 
-// The entrypoint Claude recorded. It ends the first user line, after the
-// message, so a large first message (an image) pushes it far in.
+// The tag follows the first user message, which may contain a large image.
 function entrypoint(file: string) {
 	const buf = Buffer.alloc(64 * 1024)
 	const fd = openSync(file, "r")
@@ -94,30 +94,33 @@ async function sweep(ctx: Plugin.Context) {
 	const path = resolve(process.env.XDG_DATA_HOME || DATA, "opencode", name)
 	const db = new Database(path, { readwrite: true, strict: true })
 	try {
-		db.exec("PRAGMA busy_timeout = 5000")
-		const newest = db.query("SELECT id FROM session_v2 ORDER BY time_created DESC LIMIT 1").get() as { id: string } | null
-		if (!newest) return
-		await ctx.session.get({ sessionID: newest.id }).catch((e) => {
-			throw notFound(e) ? new Error(`${path} isn't this server's database; not touching anything`) : e
-		})
+		// No busy timeout: synchronous waits block the server's own writers.
+		// A busy DB fails this sweep; a later one retries.
+		const probe = crypto.randomUUID()
+		await ctx.storage.set(PROBE, probe)
+		try {
+			const found = db.query("SELECT 1 FROM kv WHERE key = $key AND value = $value").get({ key: storageKey(PLUGIN, PROBE), value: JSON.stringify(probe) })
+			if (!found) throw new Error(`${path} isn't this server's database; not touching anything`)
+		} finally {
+			await ctx.storage.remove(PROBE)
+		}
 
 		const rows = db.query("SELECT key, value FROM kv WHERE substr(key, 1, length($prefix)) = $prefix").all({ prefix: PREFIX })
 		const all = (rows as { key: string; value: string }[]).map(({ key, value }) => {
 			const claude = JSON.parse(value)?.claudeSessionID
-			if (claude !== undefined && (typeof claude !== "string" || !UUID.test(claude)))
+			if (typeof claude !== "string" || !UUID.test(claude))
 				throw new Error(`unexpected record format under ${key}; not touching anything`)
-			return { key, sessionID: key.slice(PREFIX.length), claude }
+			return { key, sessionID: key.slice(PREFIX.length), claude, gone: false }
 		})
-		// a session is gone only if OpenCode and its database say so; any other answer keeps it
 		const known = db.query("SELECT 1 FROM session_v2 WHERE id = $id")
-		const gone = new Set<string>()
 		for (const r of all) {
 			try {
 				await ctx.session.get({ sessionID: r.sessionID })
-			} catch (e) {
-				if (!notFound(e)) console.error(LOG, `keeping ${r.sessionID}:`, e)
+			} catch (e: any) {
+				// In-process calls reject with the tagged error itself; anything else keeps it.
+				if (e?._tag !== "Session.NotFoundError") console.error(LOG, `keeping ${r.sessionID}:`, e)
 				else if (known.get({ id: r.sessionID })) throw new Error(`${path} has ${r.sessionID}, unlike this server; not touching anything`)
-				else gone.add(r.sessionID)
+				else r.gone = true
 			}
 		}
 
@@ -128,8 +131,8 @@ async function sweep(ctx: Plugin.Context) {
 			console.log(LOG, `${path} and ${dir} aren't both the default or both overridden; only removing what records name`)
 		}
 		const open = openSessions(join(dir, "sessions"))
-		const live = new Set(all.filter((r) => !gone.has(r.sessionID)).map((r) => r.claude))
-		const doomed = new Set(all.filter((r) => gone.has(r.sessionID)).map((r) => r.claude))
+		const live = new Set(all.filter((r) => !r.gone).map((r) => r.claude))
+		const doomed = new Set(all.filter((r) => r.gone).map((r) => r.claude))
 		const now = Date.now()
 		let removed = 0
 		for (const project of ls(join(dir, "projects"))) {
@@ -144,14 +147,12 @@ async function sweep(ctx: Plugin.Context) {
 				} catch {
 					continue // gone or unreadable since the listing
 				}
-				rmSync(join(base, id), { recursive: true, force: true }) // its subagent transcripts, tool output
+				rmSync(join(base, id), { recursive: true, force: true })
 				rmSync(file, { force: true })
 				removed++
 			}
 		}
-
-		// records whose transcript is still open wait for a later sweep
-		const drop = all.filter((r) => gone.has(r.sessionID) && !(r.claude && open.has(r.claude))).map((r) => r.key)
+		const drop = all.filter((r) => r.gone && !open.has(r.claude)).map((r) => r.key)
 		db.query("DELETE FROM kv WHERE key IN (SELECT value FROM json_each($keys))").run({ keys: JSON.stringify(drop) })
 		if (removed || drop.length) console.log(LOG, `removed ${removed} transcript(s), ${drop.length} record(s) of gone sessions`)
 	} finally {
@@ -159,10 +160,8 @@ async function sweep(ctx: Plugin.Context) {
 	}
 }
 
-// Plugin instances in other locations share the process (and these files):
-// sweeps run one at a time, at most one waits (deleting a session tree is one
-// event per session), and the one at load runs only once.
-const state = ((globalThis as any)[Symbol.for("sochinorth.claude-transcripts")] ??= {
+// Locations share one runner and at most one waiting sweep, including the probe.
+const state = ((globalThis as any)[Symbol.for(PLUGIN)] ??= {
 	loaded: false,
 	waiting: false,
 	warned: false,
@@ -170,21 +169,18 @@ const state = ((globalThis as any)[Symbol.for("sochinorth.claude-transcripts")] 
 })
 
 export default Plugin.define({
-	id: "sochinorth.claude-transcripts",
+	id: PLUGIN,
 	setup(ctx) {
 		const run = () => {
 			if (state.waiting) return
 			state.waiting = true
-			state.queue = state.queue.then(async () => {
+			state.queue = state.queue.then(() => {
 				state.waiting = false
-				await sweep(ctx).catch((e) => console.error(LOG, e))
+				return sweep(ctx).catch((e) => console.error(LOG, e))
 			})
 		}
-		if (!state.loaded) {
-			state.loaded = true
-			run()
-		}
-
+		if (!state.loaded) run()
+		state.loaded = true
 		const controller = new AbortController()
 		void (async () => {
 			for await (const _ of ctx.event.subscribe({ types: ["session.deleted"], signal: controller.signal })) run()
