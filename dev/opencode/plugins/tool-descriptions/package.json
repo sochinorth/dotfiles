@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
   }
 }

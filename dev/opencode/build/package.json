@@ -1,0 +1,17 @@
+{
+  "name": "opencode-plugin-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc -p ."
+  },
+  "devDependencies": {
+    "@opencode/client": "2.2.4",
+    "@opencode/plugin": "2.2.4",
+    "solid-js": "^1.9.0",
+    "typescript": "5",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}

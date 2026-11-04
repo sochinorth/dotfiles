@@ -1,0 +1,22 @@
+{
+  // Typechecks the GUI sources against this directory's node_modules (they
+  // live outside the plugin; see vite.config.ts): bun run check
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": [],
+    "paths": {
+      "solid-js": ["./node_modules/solid-js"],
+      "solid-js/*": ["./node_modules/solid-js/*"],
+      "@opencode/plugin/gui": ["./node_modules/@opencode/plugin/dist/gui/index.d.ts"]
+    }
+  },
+  "files": ["../plugins/tool-descriptions/gui/gui.tsx"]
+}

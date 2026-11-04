@@ -1,10 +1,14 @@
 // Every shell, edit, write and patch call carries a short `description` of what
-// it does, like Claude Code's Bash tool, written by the model.
+// it does, like Claude Code's Bash tool: the model writes it, and the timeline
+// (gui/) shows it on the call's folded row.
 //
 // Only the schema the model sees gains the field. The tools' own input schemas
 // ignore it, and the stored call keeps it, so it costs nothing at execution.
 // Models get either patch (GPT) or edit and write (Claude); any absent tool is
 // skipped.
+//
+// The timeline half is the GUI part, gui/, built into dist/, which the
+// desktop app loads (OpenCode Web loads no plugin GUIs).
 import { Plugin } from "@opencode/plugin"
 
 const TOOLS = ["shell", "edit", "write", "patch"]
