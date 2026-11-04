@@ -1,10 +1,16 @@
-// An OpenCode websearch provider backed by OpenAI's own search: openai, a small
-// model with web_search, on a ChatGPT login through the Codex backend or an API
-// key, summarizing with markdown citations. As Codex does, the summary comes once,
-// each paragraph under the first source it cites, and only cited sources follow.
-// Selecting it is config's job (websearch.provider), which a Console workspace's
+// OpenCode websearch providers backed by the vendors' own search, each a small
+// model summarizing with markdown citations: openai (web_search, on a ChatGPT
+// login through the Codex backend, or an API key) and anthropic (`claude -p`
+// allowed only WebSearch, inheriting the server's environment, claude-entrypoint's
+// included). As their own clients do, the summary comes once, each paragraph under
+// the first source it cites; anthropic adds Claude's other result links (Claude
+// Code), openai only cited ones (Codex).
+// Selecting one is config's job (websearch.provider), which a Console workspace's
 // own choice would otherwise override.
-// Options: openai { model: "gpt-6-luna", effort: "low" }
+// Options: openai { model: "gpt-6-luna", effort: "low" }, anthropic { model: "haiku" }
+import { spawn } from "node:child_process"
+import { once } from "node:events"
+import { homedir } from "node:os"
 import { Plugin } from "@opencode/plugin"
 
 // As the providers send them, unchecked: results() keeps only http(s) URLs and string titles.
@@ -57,13 +63,12 @@ const results = (summary: string, links: Link[]): Result[] => {
 	return [...byURL.values()]
 }
 
-// A stream's bytes as text, refusing more than MAX_BYTES; decoded once, as a chunk
-// can split a character.
-const read = async (stream: AsyncIterable<Uint8Array> | null) => {
+// A stream's bytes as text, decoded once, as a chunk can split a character. Streams
+// sharing a budget refuse more than MAX_BYTES between them.
+const read = async (stream: AsyncIterable<Uint8Array> | null, budget = { size: 0 }) => {
 	const chunks: Uint8Array[] = []
-	let size = 0
 	for await (const chunk of stream ?? []) {
-		if ((size += chunk.byteLength) > MAX_BYTES) throw new Error(`output over ${MAX_BYTES} bytes`)
+		if ((budget.size += chunk.byteLength) > MAX_BYTES) throw new Error(`output over ${MAX_BYTES} bytes`)
 		chunks.push(chunk)
 	}
 	return Buffer.concat(chunks).toString()
@@ -81,7 +86,8 @@ export default Plugin.define({
 		const text = (v: unknown) => typeof v === "string" && v !== ""
 		const openaiModel = option("openai.model", opts.openai?.model, text, "gpt-6-luna")
 		const openaiEffort = option("openai.effort", opts.openai?.effort, text, "low")
-		// Unloading aborts searches in flight.
+		const anthropicModel = option("anthropic.model", opts.anthropic?.model, text, "haiku")
+		// Unloading aborts searches in flight, killing their claude.
 		const lifetime = new AbortController()
 
 		const openai = async (query: string, signal: AbortSignal) => {
@@ -147,12 +153,53 @@ export default Plugin.define({
 			return results(summary, links)
 		}
 
+		const anthropic = async (query: string, signal: AbortSignal) => {
+			const child = spawn(
+				"claude",
+				["-p", "--model", anthropicModel, "--tools", "WebSearch", "--allowedTools", "WebSearch",
+					"--append-system-prompt", INSTRUCTIONS, "--setting-sources", "", "--strict-mcp-config",
+					"--no-session-persistence", "--output-format", "stream-json", "--verbose"],
+				{ cwd: homedir(), signal },
+			)
+			// The prompt goes on stdin, not argv, where a query starting with "-" would read as a flag.
+			child.stdin.on("error", () => {}) // An early exit closes stdin; the exit status says why.
+			child.stdin.end(query)
+			try {
+				const budget = { size: 0 }
+				const [out, err, [code, killer]] = await Promise.all([read(child.stdout, budget), read(child.stderr, budget), once(child, "close")])
+				const links: Link[] = []
+				let summary: string | undefined
+				let failure: string | undefined
+				for (const line of out.split("\n")) {
+					let event: any
+					try {
+						event = JSON.parse(line)
+					} catch {
+						continue
+					}
+					const found = event?.tool_use_result?.results
+					for (const r of Array.isArray(found) ? found : [])
+						if (Array.isArray(r?.content)) for (const l of r.content) links.push({ url: l?.url, title: l?.title })
+					if (event?.type === "result" && event.is_error) failure = String(event.result ?? event.subtype)
+					else if (event?.type === "result") summary = String(event.result ?? "")
+				}
+				if (code === 0 && summary !== undefined) return results(summary, links)
+				throw new Error(`claude: ${failure ?? (err.trim().slice(-300) || `exited with ${killer ?? code}`)}`)
+			} finally {
+				child.kill("SIGKILL") // a no-op once it has exited
+			}
+		}
+
 		await ctx.websearch.transform((editor) => {
-			editor.add({
-				id: "openai",
-				name: "OpenAI (native)",
-				execute: ({ query }, { signal }) => openai(query, AbortSignal.any([signal, lifetime.signal, AbortSignal.timeout(TIMEOUT)])),
-			})
+			for (const [id, name, search] of [
+				["openai", "OpenAI (native)", openai],
+				["anthropic", "Anthropic (native, via Claude Code)", anthropic],
+			] as const)
+				editor.add({
+					id,
+					name,
+					execute: ({ query }, { signal }) => search(query, AbortSignal.any([signal, lifetime.signal, AbortSignal.timeout(TIMEOUT)])),
+				})
 		})
 		return () => lifetime.abort()
 	},
