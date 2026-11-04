@@ -1,3 +1,14 @@
 {
-  "$schema": "https://opencode.ai/config.json"
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["-opencode.provider.openai-context-caps"],
+  "policies": [
+    { "action": "skill.use", "resource": "built-in-browser", "effect": "deny" },
+    { "action": "skill.use", "resource": "chrome-browser", "effect": "deny" },
+    { "action": "skill.use", "resource": "computer-use", "effect": "deny" },
+    { "action": "skill.use", "resource": "docs", "effect": "deny" },
+    { "action": "skill.use", "resource": "docx", "effect": "deny" },
+    { "action": "skill.use", "resource": "pdf", "effect": "deny" },
+    { "action": "skill.use", "resource": "pptx", "effect": "deny" },
+    { "action": "skill.use", "resource": "xlsx", "effect": "deny" }
+  ]
 }
