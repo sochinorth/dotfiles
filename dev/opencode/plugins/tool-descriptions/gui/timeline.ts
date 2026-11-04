@@ -17,14 +17,13 @@
 // [data-component=tool-trigger]. If that markup changes, the decorations stop
 // appearing and the timeline looks as it would without this.
 
-export type Page = { data: unknown[]; cursor: { next?: string | null } }
 export type Session = {
 	id: string
 	// the app's synced messages of the session, as the timeline renders them
-	local?(): unknown[]
+	local(): any[]
 	// the session's assistant messages from the server, newest first: for
 	// calls not synced (yet)
-	messages(cursor?: string): Promise<Page>
+	messages(cursor?: string): Promise<{ data: any[]; cursor: { next?: string | null } }>
 }
 
 const MARK = "data-tool-descriptions" // on every element we insert
@@ -35,24 +34,23 @@ const ONELINE = "data-tool-descriptions-oneline" // on a Thought shown inline
 // a patch reads as an edit: its row can't be told from one before it's looked up
 const LABEL: Record<string, string> = { edit: "Edit", write: "Write", patch: "Edit" }
 
-// the app's file-change rows, and the file names their headers show
-const FILE_ROWS = "[data-component=edit-tool], [data-component=write-tool], [data-component=apply-patch-tool]"
-const shownFiles = (row: Element) => [
-	...new Set(
-		[...row.querySelectorAll("[data-slot=apply-patch-filename]")].map((e) => e.textContent?.trim() ?? "").filter(Boolean),
-	),
-]
-
 export const CSS = `
 /* the tool's name stays the row's title; the description reads like a Thought's summary */
-[${MARK}=text] {
+[${MARK}=text],
+[${MARK}=thought],
+[data-slot=basic-tool-tool-info-main] > [${MARK}=text] ~ * {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 13px;
+}
+[${MARK}=text],
+[${MARK}=thought] {
 	color: var(--v2-text-text-muted);
 	font-weight: var(--font-weight-regular);
+}
+[${MARK}=text] {
+	font-size: 13px;
 }
 /* opened, a row shows its description in full, wrapped */
 [${OPEN}] > [${MARK}=header] [${MARK}=text],
@@ -78,22 +76,10 @@ export const CSS = `
 }
 [data-slot=basic-tool-tool-info-main] > [${MARK}=text] ~ * {
 	flex: 1 1 0;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	opacity: .55;
 }
 [data-component=tool-part-wrapper]:has([${MARK}=text]) [data-slot=collapsible-arrow] {
 	opacity: 1;
-}
-[${MARK}=thought] {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	color: var(--v2-text-text-muted);
-	font-weight: var(--font-weight-regular);
 }
 /* "Thought" and its duration keep their width; the summary gets what's left */
 [data-slot=basic-tool-tool-info-main]:has(> [${MARK}=thought]) > :not([${MARK}]) {
@@ -144,20 +130,26 @@ export const CSS = `
 }
 `
 
+// a file-change block's header line, in the app's own tool-trigger markup so
+// it's styled like the rest
+const HEADER =
+	`<div ${MARK}=header data-component=tool-trigger data-clickable=true role=button tabindex=0>` +
+	`<div data-slot=basic-tool-tool-trigger-content><div data-slot=basic-tool-tool-info><div data-slot=basic-tool-tool-info-structured>` +
+	`<div data-slot=basic-tool-tool-info-main><span data-slot=basic-tool-tool-title></span><span ${MARK}=text></span></div>` +
+	`</div></div></div><span ${MARK}=chevron><svg width="16" height="16" viewBox="0 0 20 20" fill="none">` +
+	`<path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg></span></div>`
+
 type Call = { name: string; description: string }
 
-const el = (tag: string, attrs: Record<string, string>, ...children: (Node | string)[]) => {
-	const e = document.createElement(tag)
-	for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v)
-	e.append(...children)
-	return e
+const mark = (kind: string) => {
+	const span = document.createElement("span")
+	span.setAttribute(MARK, kind)
+	return span
 }
 
-const chevronEl = () => {
-	const chevron = el("span", { [MARK]: "chevron" })
-	chevron.innerHTML =
-		'<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>'
-	return chevron
+// only on a change: writing text is a mutation, which would schedule another pass
+const setText = (node: Element | null | undefined, text: string) => {
+	if (node && node.textContent !== text) node.textContent = text
 }
 
 // A Thought's summary as one line: its blocks joined, a bold heading block
@@ -173,84 +165,64 @@ const flatten = (markdown: Element) => {
 		if (!text) continue
 		if (out) out += heading ? ": " : " "
 		out += text
-		const strong = block.children.length === 1 && block.firstElementChild?.matches("strong, b")
-		heading = !!strong && block.firstElementChild!.textContent?.trim() === text
+		const only = block.children.length === 1 ? block.firstElementChild : null
+		heading = !!only?.matches("strong, b") && only.textContent?.trim() === text
 	}
 	return out
 }
 
-// a header line in the app's own tool-trigger markup, so it's styled like the rest
-const fileHeader = (onClick: () => void) => {
-	const chevron = chevronEl()
-	const header = el(
-		"div",
-		{ [MARK]: "header", "data-component": "tool-trigger", "data-clickable": "true", role: "button", tabindex: "0" },
-		el(
-			"div",
-			{ "data-slot": "basic-tool-tool-trigger-content" },
-			el(
-				"div",
-				{ "data-slot": "basic-tool-tool-info" },
-				el(
-					"div",
-					{ "data-slot": "basic-tool-tool-info-structured" },
-					el(
-						"div",
-						{ "data-slot": "basic-tool-tool-info-main" },
-						el("span", { "data-slot": "basic-tool-tool-title" }),
-						el("span", { [MARK]: "text" }),
-					),
-				),
-			),
-		),
-		chevron,
-	)
-	header.addEventListener("click", onClick)
-	header.addEventListener("keydown", (e) => {
-		if (e.key !== "Enter" && e.key !== " ") return
-		e.preventDefault()
-		onClick()
-	})
-	return header
-}
-
 // the names of the files a file change touches: edit and write name one, a
 // patch names each in its "*** Update File: <path>" lines
-const files = (input: any): string[] => {
+const files = (input: any) => {
 	const paths: string[] =
 		typeof input?.path === "string"
 			? [input.path]
 			: typeof input?.patchText === "string"
-				? [...input.patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map((m: RegExpMatchArray) => m[1].trim())
+				? [...input.patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map((m) => m[1].trim())
 				: []
 	return [...new Set(paths.map((p) => p.split("/").pop() || p))]
 }
 
-const setText = (node: Element | null | undefined, text: string) => {
-	if (node && node.textContent !== text) node.textContent = text
-}
+// the app's file-change rows, and the file names their headers show
+const FILE_ROWS = "[data-component=edit-tool], [data-component=write-tool], [data-component=apply-patch-tool]"
+const shownFiles = (row: Element) => [
+	...new Set([...row.querySelectorAll("[data-slot=apply-patch-filename]")].map((e) => e.textContent?.trim()).filter(Boolean)),
+]
 
 // Starts decorating the document; returns a function that stops and undoes it.
-export function start(current: () => Session | undefined): () => void {
+export function start(current: () => Session | undefined) {
 	// tool call ID -> what it was; null once known to be no call we decorate
 	const calls = new Map<string, Call | null>()
 	const wanted = new Set<string>()
 	const opened = new Set<string>() // file-change blocks unfolded, by their IDs
+	// Calls the shown session's messages lack. A row can outlast a switch of
+	// sessions by a frame, and be looked up in the wrong one; so these count as
+	// no call only until the session changes.
+	const absent = new Set<string>()
+	let shown: string | undefined // the session the lookups are for
+	const follow = () => {
+		const id = current()?.id
+		if (id === shown) return
+		shown = id
+		wanted.clear()
+		for (const a of absent) calls.delete(a)
+		absent.clear()
+	}
+	let stopped = false
 
 	// What a stored tool part makes of a row: its call (null: nothing to
 	// decorate), and whether that's final; undefined while its input is still
 	// coming without a description yet. A description streams in first, so a
 	// running call usually has it before its command.
-	const resolve = (part: any): { call: Call | null; final: boolean } | undefined => {
+	const resolve = (part: any) => {
 		const streaming = part.state?.status === "streaming"
 		const description = part.state?.input?.description
 		if (typeof description === "string" && description && (part.name === "shell" || part.name in LABEL))
 			return { call: { name: part.name, description }, final: !streaming }
 		if (streaming) return
 		// a file change without one still folds, under its files' names
-		if (part.name in LABEL && files(part.state?.input).length)
-			return { call: { name: part.name, description: files(part.state.input).join(", ") }, final: true }
-		return { call: null, final: true }
+		const names = part.name in LABEL ? files(part.state?.input) : []
+		return { call: names.length ? { name: part.name, description: names.join(", ") } : null, final: true }
 	}
 
 	// the app's own synced messages, indexed once per pass: the rows on screen
@@ -259,7 +231,7 @@ export function start(current: () => Session | undefined): () => void {
 	const localPart = (id: string) => {
 		if (!local) {
 			local = new Map()
-			for (const message of (current()?.local?.() ?? []) as any[])
+			for (const message of current()?.local() ?? [])
 				for (const part of message.content ?? []) if (part.type === "tool") local.set(part.id, part)
 		}
 		return local.get(id)
@@ -281,39 +253,43 @@ export function start(current: () => Session | undefined): () => void {
 		return found
 	}
 
+	// every info-main but a subagent's starts with the title
 	const decorateShell = (row: HTMLElement, call: Call) => {
-		const main = row.querySelector("[data-component=tool-trigger] [data-slot=basic-tool-tool-info-main]")
-		if (!main) return
-		let span = main.querySelector(`:scope > [${MARK}=text]`)
-		if (!span) {
-			span = el("span", { [MARK]: "text" })
-			const title = main.querySelector(":scope > [data-slot=basic-tool-tool-title]")
-			if (title) title.after(span)
-			else main.prepend(span)
-		}
+		const title = row.querySelector(
+			"[data-component=tool-trigger] [data-slot=basic-tool-tool-info-main] > [data-slot=basic-tool-tool-title]",
+		)
+		if (!title) return
+		let span = title.parentElement!.querySelector(`:scope > [${MARK}=text]`)
+		if (!span) title.after((span = mark("text")))
 		setText(span, call.description)
 	}
 
 	const decorateFiles = (row: HTMLElement, key: string, found: Call[]) => {
 		let header = row.querySelector<HTMLElement>(`:scope > [${MARK}=header]`)
 		if (!header) {
-			header = fileHeader(() => {
-				if (opened.has(key)) opened.delete(key)
-				else opened.add(key)
+			row.insertAdjacentHTML("afterbegin", HEADER)
+			header = row.firstElementChild as HTMLElement
+			const toggle = () => {
+				if (!opened.delete(key)) opened.add(key)
 				row.toggleAttribute(OPEN, opened.has(key))
-			})
-			row.prepend(header)
+			}
+			header.onclick = toggle
+			header.onkeydown = (e) => {
+				if (e.key !== "Enter" && e.key !== " ") return
+				e.preventDefault()
+				toggle()
+			}
 		}
-		if (!row.hasAttribute(FOLD)) row.setAttribute(FOLD, "")
-		if (row.hasAttribute(OPEN) !== opened.has(key)) row.toggleAttribute(OPEN, opened.has(key))
-		const names = new Set(found.map((c) => c.name))
-		setText(header.querySelector("[data-slot=basic-tool-tool-title]"), names.size === 1 ? LABEL[found[0].name] : "Edits")
+		row.toggleAttribute(FOLD, true)
+		row.toggleAttribute(OPEN, opened.has(key))
+		const one = found.every((c) => c.name === found[0].name)
+		setText(header.querySelector("[data-slot=basic-tool-tool-title]"), one ? LABEL[found[0].name] : "Edits")
 		setText(header.querySelector(`[${MARK}=text]`), found.map((c) => c.description).join("; "))
 	}
 
 	const decorateTools = () => {
 		for (const row of document.querySelectorAll<HTMLElement>("[data-component=tool-part-wrapper]")) {
-			const key = row.dataset.timelinePartId ?? row.dataset.timelinePartIds ?? ""
+			const key = row.dataset.timelinePartId ?? row.dataset.timelinePartIds
 			if (!key) continue
 			const ids = key.split(",")
 			const found = lookup(ids)
@@ -322,40 +298,51 @@ export function start(current: () => Session | undefined): () => void {
 			if (found.length === 0 && !ids.every((id) => calls.has(id)) && row.querySelector(FILE_ROWS)) {
 				const name = row.querySelector("[data-component=write-tool]") ? "write" : "edit"
 				decorateFiles(row, key, [{ name, description: shownFiles(row).join(", ") }])
-				continue
-			}
-			if (found.length === 0) continue
-			if (found[0].name === "shell") decorateShell(row, found[0])
-			else decorateFiles(row, key, found)
+			} else if (found[0]?.name === "shell") decorateShell(row, found[0])
+			else if (found.length) decorateFiles(row, key, found)
 		}
 	}
 
-	// whether a summary fits its header line changes with the window too
-	const resized = new ResizeObserver(() => schedule())
+	// Each Thought's header line, with what it was last measured with: its text.
+	// Measuring lays the page out, so it's done again only when that text or the
+	// line's width changes.
+	const measured = new Map<Element, string>()
+	const resized = new ResizeObserver((entries) => {
+		for (const entry of entries) if (measured.has(entry.target)) measured.set(entry.target, "")
+		schedule()
+	})
 
 	// A Thought whose summary fits on its header line shows it there, with no
 	// dropdown; one that doesn't is left to the app (shown in full, with the
 	// app's arrow to fold it). Fitting is measured with the summary in place,
 	// within one task, so the trial layout is never painted.
 	const decorateThoughts = () => {
-		for (const part of document.querySelectorAll<HTMLElement>("[data-component=reasoning-part]")) {
-			const trigger = part.querySelector<HTMLElement>("[data-component=tool-trigger]")
+		for (const [trigger] of measured)
+			if (!trigger.isConnected) {
+				resized.unobserve(trigger)
+				measured.delete(trigger)
+			}
+		for (const part of document.querySelectorAll("[data-component=reasoning-part]")) {
+			const trigger = part.querySelector("[data-component=tool-trigger]")
 			const main = trigger?.querySelector("[data-slot=basic-tool-tool-info-main]")
 			const markdown = part.querySelector("[data-slot=collapsible-content] [data-component=markdown]")
 			const text = markdown ? flatten(markdown) : ""
-			let span = main?.querySelector<HTMLElement>(`:scope > [${MARK}=thought]`)
+			let span = main?.querySelector(`:scope > [${MARK}=thought]`)
 			if (!trigger || !main || !text) {
 				span?.remove()
-				if (part.hasAttribute(ONELINE)) part.removeAttribute(ONELINE)
+				part.removeAttribute(ONELINE)
+				if (trigger && measured.has(trigger)) measured.set(trigger, "")
 				continue
 			}
-			if (!span) {
-				span = main.appendChild(el("span", { [MARK]: "thought" }))
-				resized.observe(trigger)
-			}
+			span ??= main.appendChild(mark("thought"))
 			setText(span, text)
-			if (!part.hasAttribute(ONELINE)) part.setAttribute(ONELINE, "")
-			if (span.scrollWidth > span.clientWidth + 1) part.removeAttribute(ONELINE)
+			// the line's text, "Thought 5s" and all: a longer duration takes room too
+			const line = trigger.textContent ?? ""
+			if (measured.get(trigger) === line) continue
+			if (!measured.has(trigger)) resized.observe(trigger)
+			measured.set(trigger, line)
+			part.toggleAttribute(ONELINE, true)
+			part.toggleAttribute(ONELINE, span.scrollWidth <= span.clientWidth + 1)
 		}
 	}
 
@@ -383,40 +370,48 @@ export function start(current: () => Session | undefined): () => void {
 			let cursor: string | undefined
 			for (let page = 0; page < 20 && asked.size > pending.size; page++) {
 				const res = await session.messages(cursor)
-				for (const message of res.data as any[]) {
+				if (stopped) return
+				for (const message of res.data)
 					for (const part of message.content ?? []) {
 						if (part.type !== "tool" || !asked.has(part.id)) continue
 						const known = resolve(part)
-						if (!known?.final) {
-							pending.add(part.id)
-							continue
+						if (!known?.final) pending.add(part.id)
+						else {
+							calls.set(part.id, known.call)
+							asked.delete(part.id)
 						}
-						calls.set(part.id, known.call)
-						asked.delete(part.id)
 					}
-				}
 				cursor = res.cursor.next ?? undefined
 				if (!cursor) break
 			}
-			// not among this session's calls at all: not a row we decorate
-			for (const id of asked) if (!pending.has(id)) calls.set(id, null)
+			// not among this session's calls at all: not a row we decorate, while
+			// it's the session shown
+			follow()
+			if (session.id === shown)
+				for (const id of asked)
+					if (!pending.has(id)) {
+						calls.set(id, null)
+						absent.add(id)
+					}
 			for (const id of wanted) if (calls.has(id)) wanted.delete(id)
 		} catch (e) {
 			console.error("tool-descriptions:", e)
+			return
 		} finally {
 			fetching = false
 		}
+		local = undefined
 		decorateTools()
-		if (pending.size) void fetchWanted()
+		// calls still being written, and rows that asked meanwhile
+		if (wanted.size) void fetchWanted()
 	}
 
-	let queued = false
+	let frame: number | undefined
 	function schedule() {
-		if (queued) return
-		queued = true
-		requestAnimationFrame(() => {
-			queued = false
+		frame ??= requestAnimationFrame(() => {
+			frame = undefined
 			local = undefined
+			follow()
 			decorateThoughts()
 			decorateTools()
 			void fetchWanted()
@@ -426,8 +421,10 @@ export function start(current: () => Session | undefined): () => void {
 	observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 
 	return () => {
+		stopped = true
 		observer.disconnect()
 		resized.disconnect()
+		if (frame !== undefined) cancelAnimationFrame(frame)
 		clearTimeout(retry)
 		document.querySelectorAll(`[${MARK}]`).forEach((e) => e.remove())
 		for (const a of [FOLD, OPEN, ONELINE]) document.querySelectorAll(`[${a}]`).forEach((e) => e.removeAttribute(a))

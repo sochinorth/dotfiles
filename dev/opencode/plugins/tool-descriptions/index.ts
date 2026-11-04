@@ -5,7 +5,9 @@
 // Only the schema the model sees gains the field. The tools' own input schemas
 // ignore it, and the stored call keeps it, so it costs nothing at execution.
 // Models get either patch (GPT) or edit and write (Claude); any absent tool is
-// skipped.
+// skipped. Compaction and generate requests (warming among them) send the
+// session's tools too, so they get the same schemas: a request whose tools
+// differ from the turns' misses their cached prompt prefix.
 //
 // The timeline half is the GUI part, gui/, built into dist/: the desktop app
 // loads it, and so does OpenCode Web opened through the web-gui plugin.
@@ -18,26 +20,25 @@ const FIELD = {
 		"What this call does, in 5-10 words of active voice, e.g. 'Run the unit tests' or 'Handle empty input in parse()'. Shown to the user in place of the raw input.",
 }
 
-type ObjectSchema = { properties?: Record<string, unknown>; required?: string[] }
-
 export default Plugin.define({
 	id: "sochinorth.tool-descriptions",
 	async setup(ctx) {
-		await ctx.session.hook("context", (event) => {
-			for (const name of TOOLS) {
-				const tool = event.tools[name]
-				if (!tool) continue
-				const input = tool.input as ObjectSchema
-				event.tools[name] = {
-					...tool,
-					input: {
-						...input,
-						// first, so it's written (and streamed) before a long command or patch
-						properties: { description: FIELD, ...input.properties },
-						required: [...new Set(["description", ...(input.required ?? [])])],
-					},
+		for (const hook of ["context", "compaction", "generate"] as const)
+			await ctx.session.hook(hook, ({ tools }) => {
+				for (const name of TOOLS) {
+					const tool = tools[name]
+					if (!tool) continue
+					const { properties, required = [] } = tool.input as { properties?: object; required?: string[] }
+					tools[name] = {
+						...tool,
+						input: {
+							...tool.input,
+							// first, so it's written (and streamed) before a long command or patch
+							properties: { description: FIELD, ...properties },
+							required: [...new Set(["description", ...required])],
+						},
+					}
 				}
-			}
-		})
+			})
 	},
 })
