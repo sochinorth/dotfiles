@@ -99,13 +99,19 @@ export const CSS = `
 [data-slot=basic-tool-tool-info-main]:has(> [${MARK}=thought]) > :not([${MARK}]) {
 	flex-shrink: 0;
 }
+/* An inline Thought is its header line alone, whether the app has it open or
+   closed (Thinking collapsed or not): nothing but the trigger shows, and
+   nothing in it takes a click, so it can't open onto blank space. */
+[${ONELINE}] [data-component=collapsible] > :not([data-slot=collapsible-trigger]),
 [${ONELINE}] [data-slot=collapsible-content],
 [${ONELINE}] [data-slot=collapsible-arrow],
 [data-component=reasoning-part]:not([${ONELINE}]) [${MARK}=thought] {
 	display: none !important;
 }
-[${ONELINE}] [data-slot=collapsible-trigger] {
-	pointer-events: none;
+[${ONELINE}] [data-component=collapsible],
+[${ONELINE}] [data-component=collapsible] * {
+	pointer-events: none !important;
+	cursor: default !important;
 }
 [${FOLD}]:not([${OPEN}]) > :not([${MARK}=header]) {
 	display: none !important;
