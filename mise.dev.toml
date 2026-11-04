@@ -54,12 +54,13 @@ restart = "on-failure"
 [dotfiles]
 # bun's globals on PATH, and the pi alias (see the post-dotfiles hook)
 "~/.config/zsh/conf.d/dev.zsh" = { source = "dev/zsh/dev.zsh", mode = "symlink" }
-# OpenCode: the global config and the codex-sale plugin (codex.sale's models,
-# listed live) are edited in place. cli.json is the TUI's to write (theme,
+# OpenCode: the global config and plugins (codex.sale's live models and Claude's
+# entrypoint environment) are edited in place. cli.json is the TUI's to write (theme,
 # settings), only seeded. Credentials, sessions and model picks live in its
 # database (~/.local/share/opencode), not tracked; /connect them again.
 "~/.config/opencode/opencode.json" = { source = "dev/opencode/opencode.json", mode = "symlink" }
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
+"~/.config/opencode/plugins/claude-entrypoint" = { source = "dev/opencode/plugins/claude-entrypoint", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
 # IDASQL: OpenCode uses each skill directory's basename as its ID, not the
 # grouping directory or frontmatter name. Prefix the links to avoid collisions;
