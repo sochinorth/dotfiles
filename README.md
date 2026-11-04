@@ -12,6 +12,7 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | `.miserc.local.toml` | Per machine, gitignored: which modules a plain `mise bootstrap` loads | |
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
 | `dev/opencode` | OpenCode (v2): the global `opencode.json`, `cli.json` (the TUI's: theme), and `plugins/codex-sale`, which defines the codex.sale provider and lists its models live from its `/v1/models`, with capabilities and limits from OpenCode's catalog | mise links `opencode.json` and the plugin into `~/.config/opencode`, seeds `cli.json` |
+| `dev/skills/idasql` | [idasql-skills](https://github.com/allthingsida/idasql-skills), pinned as a submodule (skills and their references, unchanged upstream) | mise links each skill into `~/.config/opencode/skills/idasql-*`, giving it an IDASQL-prefixed ID |
 | `dotfiles/fortune` | fortune cookies fortune-mod doesn't ship: its offensive (`-off`) set, which Arch builds without, and others (sources below) | mise links each into `~/.local/share/fortune`; `post-dotfiles` runs `strfile` |
 | `README.local.md` | Per machine, gitignored: notes about this machine (what isn't captured, where) | |
 
@@ -53,11 +54,21 @@ Then copy `~/.ssh/id_ed25519_*` over by hand (keys are deliberately not in the r
 
 With dev, sign the coding agents in again: credentials stay out of the repo. Claude Code: sign in once with `claude`, for OpenCode's Claude Agent provider. OpenCode: `/connect` each provider (codex.sale, OpenRouter, DeepSeek, ...). pi: its own sign-in (it keeps it in `~/.pi/agent/auth.json`).
 
-The Kakoune config (`dotfiles/config/kak`) is a submodule, cloned over HTTPS
-(no keys needed yet). A clone made without `--recurse-submodules` gets it from
-the `pre-dotfiles` hook; by hand, `git submodule update --init`. After pulling a
-commit that moves it, `git submodule update` (that checks out the recorded
-commit: commit and push work in the submodule first).
+The Kakoune config (`dotfiles/config/kak`) and IDASQL skills (`dev/skills/idasql`)
+are submodules, cloned over HTTPS (no keys needed yet). A clone made without
+`--recurse-submodules` gets them from the `pre-dotfiles` hook; by hand,
+`git submodule update --init`. After pulling a commit that moves one,
+`git submodule update` (that checks out the recorded commit: commit and push
+work in the submodule first).
+
+IDASQL skills are loaded by OpenCode itself, not through Claude Code's plugin
+marketplace. Start with `@idasql-connect`; all 16 skill IDs are prefixed
+(`idasql-analysis`, `idasql-decompiler`, `idasql-xrefs`, etc.). OpenCode derives
+IDs from each linked directory's basename; a parent grouping directory would
+not namespace them. Display names and cross-skill names in the upstream text
+remain unchanged: for example, its `connect` means `idasql-connect` here.
+To update, run
+`git -C dev/skills/idasql pull --ff-only` and record the new submodule commit.
 
 ## Order of operations, and why
 
@@ -72,7 +83,7 @@ That dependency chain fixes the order:
    - installs `paru` (prebuilt, cachyos repo), removes real sudo only after `doas true` succeeds, then `paru` installs fudo-git
 3. `[bootstrap.packages]`: pacman, now through sudo → fudo → doas; `aur:` entries through paru, which uses the stock `/etc/paru.conf` and elevates through sudo → fudo → doas too. Don't create an empty `~/.config/paru/paru.conf`: any user file replaces `/etc/paru.conf` and loses its defaults.
 4. `[bootstrap.files]`: `/etc` configs; with WSL, also the `/usr/local/bin/xclip` → `win32yank.exe` shim.
-5. The `pre-dotfiles` hook (checks out the submodule if the clone lacks it), `[dotfiles]`, then the `post-dotfiles` hooks: `scripts/post-dotfiles.sh` (broot `br` launcher, tealdeer cache, fortune indexes), then with dev `dev/post-dotfiles.sh` (pi and its shims, linger for the dropbear unit, kak-tree-sitter grammars). Hooks from each file add up; a module's hook doesn't replace the generic one.
+5. The `pre-dotfiles` hook (checks out missing submodules), `[dotfiles]`, then the `post-dotfiles` hooks: `scripts/post-dotfiles.sh` (broot `br` launcher, tealdeer cache, fortune indexes), then with dev `dev/post-dotfiles.sh` (pi and its shims, linger for the dropbear unit, kak-tree-sitter grammars). Hooks from each file add up; a module's hook doesn't replace the generic one.
 6. With dev, the dropbear user unit (`dev.mise.dropbear.service`, enabled and started); then login shell → zsh; with WSL, the `final` hook writes `.wslconfig` on the Windows side.
 
 ## Gotchas captured here

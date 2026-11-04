@@ -15,9 +15,9 @@
 [bootstrap.hooks]
 # Repos, keys and fudo-git must exist before mise installs packages with `sudo`.
 pre-packages = "bash '{{ config_root }}/scripts/pre-packages.sh'"
-# The submodule (the Kakoune config, dotfiles/config/kak, is the kakmux repo):
-# checked out here when the clone was made without --recurse-submodules. One
-# already checked out is left alone (it's the live config, maybe ahead).
+# Submodules (Kakoune in dotfiles/config/kak, IDASQL skills in dev/skills/idasql):
+# checked out here when the clone was made without --recurse-submodules. Those
+# already checked out are left alone (the live config may be ahead).
 pre-dotfiles = """
 cd '{{ config_root }}' || exit
 if git submodule status | grep -q '^-'; then git submodule update --init; fi

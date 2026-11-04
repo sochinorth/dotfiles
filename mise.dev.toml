@@ -61,5 +61,24 @@ restart = "on-failure"
 "~/.config/opencode/opencode.json" = { source = "dev/opencode/opencode.json", mode = "symlink" }
 "~/.config/opencode/plugins/codex-sale" = { source = "dev/opencode/plugins/codex-sale", mode = "symlink" }
 "~/.config/opencode/cli.json/defaults" = { source = "dev/opencode/cli.json", merge = "missing" }
+# IDASQL: OpenCode uses each skill directory's basename as its ID, not the
+# grouping directory or frontmatter name. Prefix the links to avoid collisions;
+# keep upstream files and their relative reference paths intact.
+"~/.config/opencode/skills/idasql-analysis" = { source = "dev/skills/idasql/plugins/idasql/skills/analysis", mode = "symlink" }
+"~/.config/opencode/skills/idasql-annotations" = { source = "dev/skills/idasql/plugins/idasql/skills/annotations", mode = "symlink" }
+"~/.config/opencode/skills/idasql-connect" = { source = "dev/skills/idasql/plugins/idasql/skills/connect", mode = "symlink" }
+"~/.config/opencode/skills/idasql-data" = { source = "dev/skills/idasql/plugins/idasql/skills/data", mode = "symlink" }
+"~/.config/opencode/skills/idasql-debugger" = { source = "dev/skills/idasql/plugins/idasql/skills/debugger", mode = "symlink" }
+"~/.config/opencode/skills/idasql-decompiler" = { source = "dev/skills/idasql/plugins/idasql/skills/decompiler", mode = "symlink" }
+"~/.config/opencode/skills/idasql-deep-links" = { source = "dev/skills/idasql/plugins/idasql/skills/deep-links", mode = "symlink" }
+"~/.config/opencode/skills/idasql-disassembly" = { source = "dev/skills/idasql/plugins/idasql/skills/disassembly", mode = "symlink" }
+"~/.config/opencode/skills/idasql-functions" = { source = "dev/skills/idasql/plugins/idasql/skills/functions", mode = "symlink" }
+"~/.config/opencode/skills/idasql-grep" = { source = "dev/skills/idasql/plugins/idasql/skills/grep", mode = "symlink" }
+"~/.config/opencode/skills/idasql-idapython" = { source = "dev/skills/idasql/plugins/idasql/skills/idapython", mode = "symlink" }
+"~/.config/opencode/skills/idasql-re-source" = { source = "dev/skills/idasql/plugins/idasql/skills/re-source", mode = "symlink" }
+"~/.config/opencode/skills/idasql-storage" = { source = "dev/skills/idasql/plugins/idasql/skills/storage", mode = "symlink" }
+"~/.config/opencode/skills/idasql-types" = { source = "dev/skills/idasql/plugins/idasql/skills/types", mode = "symlink" }
+"~/.config/opencode/skills/idasql-ui-context" = { source = "dev/skills/idasql/plugins/idasql/skills/ui-context", mode = "symlink" }
+"~/.config/opencode/skills/idasql-xrefs" = { source = "dev/skills/idasql/plugins/idasql/skills/xrefs", mode = "symlink" }
 # who may log in through dropbear (the phone); a copy at 0600, like ~/.ssh/config
 "~/.ssh/authorized_keys" = { source = "dev/ssh/authorized_keys", mode = "copy", permissions = "0600" }

@@ -2,3 +2,6 @@
 	path = dotfiles/config/kak
 	url = https://github.com/sochinorth/kakmux.git
 	branch = trunk
+[submodule "dev/skills/idasql"]
+	path = dev/skills/idasql
+	url = https://github.com/allthingsida/idasql-skills
