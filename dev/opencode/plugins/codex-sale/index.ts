@@ -1,42 +1,39 @@
 // codex.sale (an OpenAI Responses reseller) as a provider whose models are
 // listed live rather than hand-kept in opencode.json.
 //
-// The API key is the one /connect stores for the codex-sale integration, which
-// this plugin registers (so opencode.json needn't mention codex.sale). The
-// plugin asks codex.sale's /v1/models with it, and since that only returns IDs,
-// takes each model's capabilities, limits and variants from OpenCode's own
-// catalog (models.dev) under the provider that owns it (openai/gpt-6.1-sol for
-// gpt-6.1-sol); IDs the catalog doesn't know get OpenCode's defaults. Prices
-// are left out: they're codex.sale's, not the catalog's.
+// It registers the codex-sale integration, so /connect stores a key for it and
+// opencode.json needn't mention codex.sale. With the selected key it asks
+// /v1/models, which only returns IDs, and takes each model's capabilities,
+// limits and variants from OpenCode's own catalog (models.dev), under the
+// provider that owns it first; IDs the catalog doesn't know get OpenCode's
+// defaults. Prices are left out: they're codex.sale's, not the catalog's.
 //
-// Refreshes when the credential changes and every 6 hours. The last list and
-// the connection it came from are kept in plugin storage, so the models are
-// there at startup and offline, and hidden while another key is selected.
+// Refreshes when the credential changes and every 6 hours. The last list is
+// stored with the connection it came from, so the models are there at startup
+// and offline, and hidden while another key is selected.
 //
 // OpenCode finds it in ~/.config/opencode/plugins/ on its own. Edits need
-// `opencode service restart`: the service caches the module by path, so a
-// reload runs the old code.
+// `opencode service restart`: the service caches the module by path.
 //
-// Options, if the defaults don't fit, in opencode.json:
+// Options, in opencode.json:
 //   "plugins": [{ "package": "./plugins/codex-sale", "options": { ... } }]
-//   owners   upstreams to offer (owned_by in /v1/models). Default ["openai"]:
-//            the provider speaks OpenAI Responses. ["*"] offers all it lists.
-//   baseURL  default https://codex.sale/v1
+//   owners   owned_by values to offer. Default ["openai"]: the provider speaks
+//            OpenAI Responses. ["*"] offers all it lists.
+//   baseURL  an http(s) URL, default https://codex.sale/v1
 import { Model, Plugin, Provider } from "@opencode/plugin"
 
 const PROVIDER = "codex-sale"
-const REFRESH_MS = 6 * 60 * 60 * 1000
-// /v1/models' owned_by -> catalog providers to look a model up under first
-const CATALOG: Record<string, string[]> = {
-	openai: ["openai"],
-	anthropic: ["anthropic"],
-	zhipu: ["zhipuai", "zai"],
-	deepseek: ["deepseek"],
-}
-// not chat models (the catalog files gpt-4o-transcribe under chat too)
+// /v1/models' owned_by -> preferred catalog providers
+const CATALOG = new Map<string, string[]>([
+	["openai", ["openai"]],
+	["anthropic", ["anthropic"]],
+	["zhipu", ["zhipuai", "zai"]],
+	["deepseek", ["deepseek"]],
+])
+// The catalog files some non-chat models (e.g. gpt-4o-transcribe) under chat.
 const NOT_CHAT = /image|transcribe|tts|whisper|embed|realtime|moderation/
 
-// /v1/models' data, or the stored copy: one entry per string id, in order
+// API or cached data: keep the first entry per nonempty string id, in order.
 const parse = (data: unknown) => {
 	if (!Array.isArray(data)) return
 	const byID = new Map<string, { id: string; owned_by?: string }>()
@@ -46,7 +43,7 @@ const parse = (data: unknown) => {
 	return [...byID.values()]
 }
 
-// what OpenCode tells connections apart by; undefined for anything that isn't one
+// OpenCode's connection identity; metadata changes don't change the key.
 const key = (c: any) => {
 	const id = c?.type === "credential" ? c.id : c?.type === "env" ? c.name : undefined
 	return typeof id === "string" ? `${c.type}:${id}` : undefined
@@ -64,7 +61,7 @@ export default Plugin.define({
 			return fallback
 		}
 		const owners = option("owners", (v) => Array.isArray(v) && v.every((x) => typeof x === "string"), ["openai"])
-		const baseURL = option("baseURL", (v) => typeof v === "string" && URL.canParse(v), "https://codex.sale/v1").replace(/\/$/, "")
+		const baseURL = option("baseURL", (v) => typeof v === "string" && /^https?:\/\//.test(v) && URL.canParse(v), "https://codex.sale/v1").replace(/\/$/, "")
 		const providerID = Provider.ID.make(PROVIDER)
 		const info: Provider.Info = {
 			...Provider.Info.empty(providerID),
@@ -75,80 +72,74 @@ export default Plugin.define({
 			settings: { baseURL, reasoningEffort: "medium", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] },
 		}
 
-		let listed = parse(await ctx.storage.get("listed")) ?? []
-		// the connection the list came from: OpenCode hides it while another is selected
-		let source: Awaited<ReturnType<typeof ctx.integration.connection.active>>
-		const stored = await ctx.storage.get("source")
-		if (key(stored)) source = stored as typeof source
-
+		// One stored value keeps list/source paired; ignore lists without provenance.
+		type Connection = Awaited<ReturnType<typeof ctx.integration.connection.active>>
+		const stored = (await ctx.storage.get("models")) as { listed?: unknown; source?: Connection } | undefined
+		let source = key(stored?.source) ? stored?.source : undefined
+		let listed = (source && parse(stored?.listed)) || []
 		const controller = new AbortController()
-		const load = async () => {
-			const connection = await ctx.integration.connection.active(PROVIDER)
-			if (!connection) return
-			const credential = await ctx.integration.connection.resolve(connection)
-			if (credential?.type !== "key") return
-			const res = await fetch(`${baseURL}/models`, {
-				headers: { authorization: `Bearer ${credential.key}` },
-				signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
-			})
-			if (!res.ok) throw new Error(`GET /models: HTTP ${res.status}`)
-			// a body without a data array is an error, not an empty list
-			const fresh = parse((await res.json())?.data)
-			if (!fresh) throw new Error("GET /models: no data array")
-			// switched mid-fetch: the rerun the switch queued lists the new key's models
-			if (closed || key(await ctx.integration.connection.active(PROVIDER)) !== key(connection)) return
-			if (JSON.stringify(fresh) === JSON.stringify(listed) && key(source) === key(connection)) return
-			listed = fresh
-			source = connection
-			await ctx.storage.set("listed", listed)
-			await ctx.storage.set("source", source)
-			if (!closed) await ctx.provider.reload()
-		}
-		// one load at a time, so an older one can't land last; calls during one
-		// coalesce into a single rerun after it
 		let running = false
 		let again = false
+		// One runner: calls during a fetch coalesce into one rerun, never race it.
 		const refresh = async () => {
 			again = true
 			if (running) return
 			running = true
 			while (again && !closed) {
 				again = false
-				await load().catch(log)
+				try {
+					const connection = await ctx.integration.connection.active(PROVIDER)
+					if (!connection) continue
+					const credential = await ctx.integration.connection.resolve(connection)
+					if (credential?.type !== "key") continue
+					const res = await fetch(`${baseURL}/models`, {
+						headers: { authorization: `Bearer ${credential.key}` },
+						signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+					})
+					if (!res.ok) throw new Error(`GET /models: HTTP ${res.status}`)
+					const fresh = parse(((await res.json()) as { data?: unknown } | null)?.data)
+					if (!fresh) throw new Error("GET /models: no data array") // Not an empty inventory.
+					// A switch queues a rerun; don't publish the old connection's result.
+					const active = await ctx.integration.connection.active(PROVIDER)
+					if (closed || key(active) !== key(connection)) continue
+					if (JSON.stringify(fresh) === JSON.stringify(listed) && key(source) === key(connection)) continue
+					// Persist before committing in memory, so failed writes remain retryable.
+					await ctx.storage.set("models", { listed: fresh, source: connection })
+					listed = fresh
+					source = connection
+					if (!closed) await ctx.provider.reload()
+				} catch (e) {
+					log(e)
+				}
 			}
 			running = false
 		}
 
-		// the integration /connect stores the key under (opencode.json declaring the
-		// provider would create it too; here nothing else does)
+		// the integration /connect stores the key under
 		await ctx.integration.transform((editor) => {
 			editor.method.update({ integrationID: PROVIDER, method: { type: "key", label: "codex.sale API key" } })
 		})
-
 		await ctx.provider.transform((editor) => {
 			const models: Model.Info[] = []
 			for (const { id, owned_by: owner = "" } of listed) {
 				if (!owners.includes("*") && !owners.includes(owner)) continue
-				const known = [...(CATALOG[owner] ?? []).map((p) => editor.get(p)), ...editor.list()]
-					.find((r) => r?.models.has(id))
-					?.models.get(id)
+				const known = [...(CATALOG.get(owner) ?? []).map((p) => editor.get(p)), ...editor.list()]
+					.find((r) => r?.models.has(id))?.models.get(id)
 				if (NOT_CHAT.test(id) || (known?.type ?? "chat") !== "chat") continue
 				const base: Model.Info = Model.Info.default(providerID, Model.ID.make(id))
 				const { name, family, capabilities, variants, time, status, limit } = known ?? base
 				models.push({ ...base, name, family, capabilities, variants, time, status, limit })
 			}
-			// replaces the record, keeping the provider if opencode.json declares it too
+			// Preserve a configured provider, but bind its inventory too.
 			editor.add({ info: editor.get(PROVIDER)?.provider ?? info, models, sourceConnection: source })
 		})
 
-		// the first fetch doesn't hold up startup; the stored list serves meanwhile
-		void refresh()
+		void refresh() // The stored list serves startup while this runs.
 		void (async () => {
 			const types = ["credential.switched", "credential.updated", "integration.updated"] as const
 			for await (const _ of ctx.event.subscribe({ types, signal: controller.signal })) void refresh()
 		})().catch(log)
-		const timer = setInterval(refresh, REFRESH_MS)
-
+		const timer = setInterval(refresh, 6 * 60 * 60 * 1000)
 		return () => {
 			closed = true
 			controller.abort()
