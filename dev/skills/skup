@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# Skills picked from upstream repos: tracked clones in ~/.local/share/agent-skills,
+# our edits in upstream.patch, links into ~/.config/opencode/skills from upstream.list.
+#
+#	skup			pull the clones, reapply the patch, relink, show what changed
+#	skup sync		clone what's missing, reapply the patch, relink; never pulls
+#	skup diff		show the upstream changes to picked skills that skup would pull
+#	skup check		fetch and print the picked skills with changes (zsh runs this daily)
+#	skup patch		rewrite upstream.patch from the edits in the clones
+#
+# To change an upstream skill: edit it in its clone, then `skup patch`.
+set -euo pipefail
+
+here=$(dirname "$(readlink -f "$0")")
+list=$here/upstream.list
+patchfile=$here/upstream.patch
+root=${XDG_DATA_HOME:-$HOME/.local/share}/agent-skills
+links=${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/skill-updates
+clones=(mattpocock-skills cursor-plugins)
+
+clone() {
+	[[ -d $root/$1/.git ]] && return
+	mkdir -p "$root"
+	case $1 in
+	mattpocock-skills) git clone -q https://github.com/mattpocock/skills "$root/$1" ;;
+	cursor-plugins)
+		git clone -q --filter=blob:none --sparse https://github.com/cursor/plugins "$root/$1"
+		git -C "$root/$1" sparse-checkout set pstack
+		;;
+	esac
+}
+
+entries() { grep -vE '^[[:space:]]*(#|$)' "$list"; }
+
+# Paths within one clone, relative to it.
+picked_paths() {
+	local id path
+	while read -r id path; do
+		[[ $path == "$1"/* ]] && printf '%s\n' "${path#"$1"/}"
+	done < <(entries)
+	return 0
+}
+
+# The clones' current edits, kept so a failed step can put them back.
+save_edits() {
+	saved=$(mktemp -d)
+	trap 'rm -rf "$saved"' EXIT
+	local c
+	for c in "${clones[@]}"; do git -C "$root/$c" diff --binary HEAD > "$saved/$c"; done
+}
+
+restore_edits() {
+	local c rc=0
+	for c in "${clones[@]}"; do
+		git -C "$root/$c" reset -q --hard
+		if [[ -s $saved/$c ]]; then git -C "$root/$c" apply "$saved/$c" || rc=1; fi
+	done
+	return "$rc"
+}
+
+# Applies all of it or none of it.
+apply_patch() {
+	[[ -s $patchfile ]] || return 0
+	patch -d "$root" -p1 --dry-run --silent --forward < "$patchfile" || return 1
+	patch -d "$root" -p1 --silent --forward --no-backup-if-mismatch < "$patchfile"
+}
+
+# Throw away the clones' edits and put the patch back, so the tree always matches
+# it. If the patch doesn't fit, the clones stay as they were and this fails.
+reapply() {
+	local c
+	save_edits
+	for c in "${clones[@]}"; do git -C "$root/$c" reset -q --hard; done
+	apply_patch || { restore_edits; return 1; }
+}
+
+relink() {
+	local id path wanted=" "
+	mkdir -p "$links"
+	while read -r id path; do
+		[[ -e $root/$path ]] || { echo "skup: upstream no longer has $path (skill $id)" >&2; continue; }
+		ln -sfn "$root/$path" "$links/$id"
+		wanted+="$id "
+	done < <(entries)
+	# Prune links into the clones that the list has dropped; other skills' links stay.
+	local link
+	for link in "$links"/*; do
+		[[ -L $link && $(readlink "$link") == "$root"/* ]] || continue
+		[[ $wanted == *" ${link##*/} "* ]] || rm -- "$link"
+	done
+}
+
+# IDs of picked skills that differ between two revisions of a clone.
+changed_ids() {
+	local c=$1 from=$2 to=$3 id path
+	while read -r id path; do
+		[[ $path == "$c"/* ]] || continue
+		git -C "$root/$c" diff --quiet "$from" "$to" -- "${path#"$c"/}" || printf '%s\n' "${id%.md}"
+	done < <(entries)
+}
+
+cmd_sync() {
+	local c
+	for c in "${clones[@]}"; do clone "$c"; done
+	reapply || { echo "skup: upstream.patch doesn't apply; run skup" >&2; return 1; }
+	relink
+}
+
+cmd_check() {
+	local c ids=()
+	for c in "${clones[@]}"; do
+		[[ -d $root/$c/.git ]] || continue
+		git -C "$root/$c" fetch -q 2>/dev/null || continue
+		mapfile -t -O "${#ids[@]}" ids < <(changed_ids "$c" HEAD '@{u}')
+	done
+	(( ${#ids[@]} )) || return 0
+	local IFS=,
+	printf '%s\n' "${ids[*]}" | sed 's/,/, /g'
+}
+
+cmd_diff() {
+	local c paths
+	for c in "${clones[@]}"; do
+		git -C "$root/$c" fetch -q
+		mapfile -t paths < <(picked_paths "$c")
+		git -C "$root/$c" --no-pager diff HEAD '@{u}' -- "${paths[@]}"
+	done
+}
+
+cmd_update() {
+	local c
+	local -A before
+	# Fetch everything first: offline, this stops here with the skills untouched.
+	for c in "${clones[@]}"; do
+		clone "$c"
+		git -C "$root/$c" fetch -q
+	done
+	save_edits
+	local ok=1
+	for c in "${clones[@]}"; do
+		before[$c]=$(git -C "$root/$c" rev-parse HEAD)
+		git -C "$root/$c" reset -q --hard
+		git -C "$root/$c" merge -q --ff-only '@{u}' || ok=
+	done
+	if [[ -z $ok ]] || ! apply_patch; then
+		for c in "${clones[@]}"; do git -C "$root/$c" reset -q --hard "${before[$c]}"; done
+		restore_edits
+		echo "skup: couldn't take upstream with upstream.patch on top, so the skills stay as they were." >&2
+		echo "skup: pull a clone by hand, redo the rejected edits, and run skup patch." >&2
+		return 1
+	fi
+	relink
+	mkdir -p "${cache%/*}"
+	: > "$cache"
+	local ids
+	for c in "${clones[@]}"; do
+		ids=$(changed_ids "$c" "${before[$c]}" HEAD)
+		[[ -z $ids ]] && continue
+		printf 'Changed in %s:\n%s\n' "$c" "$(sed 's/^/  /' <<< "$ids")"
+		printf '  diff: git -C %q diff %s..HEAD\n' "$root/$c" "${before[$c]:0:7}"
+	done
+}
+
+cmd_patch() {
+	local c
+	for c in "${clones[@]}"; do
+		git -C "$root/$c" diff --src-prefix="a/$c/" --dst-prefix="b/$c/" HEAD
+	done > "$patchfile"
+}
+
+case ${1:-update} in
+update) cmd_update ;;
+sync) cmd_sync ;;
+check) cmd_check ;;
+diff) cmd_diff ;;
+patch) cmd_patch ;;
+*) sed -n '2,11p' "$0" >&2; exit 2 ;;
+esac

@@ -1,0 +1,42 @@
+# Skills picked from upstream repos: <skill ID> <path under ~/.local/share/agent-skills>.
+# The ID is the link's name in ~/.config/opencode/skills. A file path with an ID
+# ending in .md links a flat skill. skup makes and prunes the links from this list.
+
+grilling			mattpocock-skills/skills/productivity/grilling
+handoff				mattpocock-skills/skills/productivity/handoff
+agent-docs			mattpocock-skills/skills/productivity/writing-for-agents
+diagnose			mattpocock-skills/skills/engineering/diagnosing-bugs
+arch-review			mattpocock-skills/skills/engineering/improve-codebase-architecture
+deep-modules		mattpocock-skills/skills/engineering/codebase-design
+
+arena				cursor-plugins/pstack/skills/arena
+bench-check			cursor-plugins/pstack/skills/benchmark-checklist
+blast-radius		cursor-plugins/pstack/skills/blast-radius
+bro					cursor-plugins/pstack/skills/bro
+build-verifier		cursor-plugins/pstack/skills/create-verification-skill
+correct				cursor-plugins/pstack/skills/correct
+how					cursor-plugins/pstack/skills/how
+sharpen				cursor-plugins/pstack/skills/sharpen
+sitrep				cursor-plugins/pstack/skills/ketchup
+unslop				cursor-plugins/pstack/skills/unslop
+update-verifier		cursor-plugins/pstack/skills/maintain-verification-skill
+why					cursor-plugins/pstack/skills/why
+hillclimb.md		cursor-plugins/pstack/skills/poteto-mode/playbooks/hillclimb.md
+
+# Advertised to the model, for moments an agent can recognize.
+principle-attack-the-premise						cursor-plugins/pstack/skills/principle-attack-the-premise
+principle-encode-lessons-in-structure				cursor-plugins/pstack/skills/principle-encode-lessons-in-structure
+principle-explain-the-number						cursor-plugins/pstack/skills/principle-explain-the-number
+principle-fix-root-causes							cursor-plugins/pstack/skills/principle-fix-root-causes
+principle-make-operations-idempotent				cursor-plugins/pstack/skills/principle-make-operations-idempotent
+principle-migrate-callers-then-delete-legacy-apis	cursor-plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis
+principle-separate-before-serializing-shared-state	cursor-plugins/pstack/skills/principle-separate-before-serializing-shared-state
+principle-test-behavior-not-implementation			cursor-plugins/pstack/skills/principle-test-behavior-not-implementation
+
+# Hidden: here because the skills above link to them.
+principle-build-the-lever							cursor-plugins/pstack/skills/principle-build-the-lever
+principle-guard-the-context-window					cursor-plugins/pstack/skills/principle-guard-the-context-window
+principle-laziness-protocol							cursor-plugins/pstack/skills/principle-laziness-protocol
+principle-prove-it-works							cursor-plugins/pstack/skills/principle-prove-it-works
+principle-redesign-from-first-principles			cursor-plugins/pstack/skills/principle-redesign-from-first-principles
+principle-sequence-verifiable-units					cursor-plugins/pstack/skills/principle-sequence-verifiable-units

@@ -13,6 +13,7 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | `dotfiles/config/kak` | Kakoune: kakrc, kakbr, `kakmux`/`kakbr-sidebar`/`broot-open`, `kak()`/`kakbr()`; the [kakmux](https://github.com/sochinorth/kakmux) repo as a submodule, with its own tests | mise links each file (`[dotfiles]`) |
 | `dev/opencode` | OpenCode (v2): the global `opencode.json`, `cli.json` (the TUI's: theme), `AGENTS.md` (global instructions: workflow state goes in the project scratchpad, never in the project), `plugins/codex-sale` (live models with catalog capabilities and limits), `plugins/compaction` (compaction into a tree: an index in context, the session's whole transcript in its scratchpad, large tool outputs filed whole; native for OpenAI models; `/compact <focus>`), `plugins/claude-entrypoint` (Claude launch environment), `plugins/claude-transcripts` (deletes Claude transcripts of deleted sessions), `plugins/follow-tools` (unfolds the grouped tool block the agent is working in, folds it when it moves on), `plugins/native-search` (web search through OpenAI's and Claude's own search tools), `plugins/scratchpad` (a scratchpad per project, and one per session inside it, deleted with the session), `plugins/tool-descriptions` (a short description on every shell and file-change call, shown in the timeline), `web-gui.ts` (desktop GUI plugins in OpenCode Web, through a local proxy; the `opencode.web-gui` unit runs it), and `build` (builds plugins' GUI parts) | mise links `opencode.json`, `AGENTS.md` and the plugins into `~/.config/opencode`, seeds `cli.json`; `post-dotfiles` runs `build` |
 | `dev/skills/idasql` | [idasql-skills](https://github.com/allthingsida/idasql-skills), pinned as a submodule (skills and their references, unchanged upstream) | mise links each skill into `~/.config/opencode/skills/idasql-*`, giving it an IDASQL-prefixed ID |
+| `dev/skills/upstream.list`, `upstream.patch`, `skup` | Skills picked from [mattpocock/skills](https://github.com/mattpocock/skills) and [pstack](https://github.com/cursor/plugins/tree/main/pstack): which ones, our edits to them, and the script that clones, patches and links them | `skup` clones into `~/.local/share/agent-skills` and links into `~/.config/opencode/skills` |
 | `dotfiles/fortune` | fortune cookies fortune-mod doesn't ship: its offensive (`-off`) set, which Arch builds without, and others (sources below) | mise links each into `~/.local/share/fortune`; `post-dotfiles` runs `strfile` |
 | `README.local.md` | Per machine, gitignored: notes about this machine (what isn't captured, where) | |
 
@@ -69,6 +70,24 @@ not namespace them. Display names and cross-skill names in the upstream text
 remain unchanged: for example, its `connect` means `idasql-connect` here.
 To update, run
 `git -C dev/skills/idasql pull --ff-only` and record the new submodule commit.
+
+The other skills are picked one by one rather than kept whole, so they aren't
+submodules: `skup` keeps tracked clones in `~/.local/share/agent-skills` with
+`dev/skills/upstream.patch` applied, and links what `dev/skills/upstream.list`
+names. The bootstrap only clones what's missing and reapplies the patch. Pulling
+is by hand, so a skill can't change under an overnight run: `.zshrc` checks daily
+and prints `skill updates: ... (run skup)`, `skup diff` shows what's waiting, and
+`skup` pulls. If the patch no longer applies, the skills stay as they were and
+`skup` says so. To change an upstream skill, edit it in its clone and run
+`skup patch`.
+
+A skill's ID is its link's name, which is how `diagnosing-bugs` becomes `diagnose`
+here; the patch renames references to it. Plain IDs rather than prefixes, since
+skills in these repos name and link each other by plain name. Skills are called
+with `@id`, and most are hidden from the model until then. The advertised ones are
+those it should reach for by itself: `grilling`, `diagnose`, `agent-docs`, `unslop`
+and eight `principle-*`. Other `principle-*` skills are here only because a pick
+links to them; pstack has more, one line in `upstream.list` away.
 
 ## Order of operations, and why
 

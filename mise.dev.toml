@@ -117,5 +117,7 @@ restart_sec = "5"
 "~/.config/opencode/skills/idasql-types" = { source = "dev/skills/idasql/plugins/idasql/skills/types", mode = "symlink" }
 "~/.config/opencode/skills/idasql-ui-context" = { source = "dev/skills/idasql/plugins/idasql/skills/ui-context", mode = "symlink" }
 "~/.config/opencode/skills/idasql-xrefs" = { source = "dev/skills/idasql/plugins/idasql/skills/xrefs", mode = "symlink" }
+# Skills picked from upstream are linked by skup, from tracked clones outside this repo.
+"~/.local/bin/skup" = { source = "dev/skills/skup", mode = "symlink" }
 # who may log in through dropbear (the phone); a copy at 0600, like ~/.ssh/config
 "~/.ssh/authorized_keys" = { source = "dev/ssh/authorized_keys", mode = "copy", permissions = "0600" }

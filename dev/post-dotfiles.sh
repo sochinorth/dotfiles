@@ -22,6 +22,11 @@ for f in node npm npx; do ln -sfn /usr/bin/bun ~/.local/pi-shims/$f; done
 # once.
 [[ -e /var/lib/systemd/linger/$USER ]] || sudo loginctl enable-linger "$USER"
 
+# Skills picked from upstream: cloned if missing, patched, linked. Never pulls;
+# that's skup, by hand. Non-fatal: it fetches.
+"$(dirname "$0")/skills/skup" sync \
+	|| echo "post-dotfiles: skup sync failed; rerun it, or the bootstrap, later" >&2
+
 # kak-tree-sitter's grammars and queries for these languages (fetched and
 # compiled; a no-op for those already at their pinned version). Languages
 # without one keep Kakoune's own highlighting (kakrc sees to that). More:

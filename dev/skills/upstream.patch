@@ -1,0 +1,693 @@
+diff --git a/mattpocock-skills/skills/engineering/codebase-design/SKILL.md b/mattpocock-skills/skills/engineering/codebase-design/SKILL.md
+index 3f63c81..ca395c0 100644
+--- a/mattpocock-skills/skills/engineering/codebase-design/SKILL.md
++++ b/mattpocock-skills/skills/engineering/codebase-design/SKILL.md
+@@ -1,6 +1,7 @@
+ ---
+-name: codebase-design
++name: deep-modules
+ description: Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.
++disable-model-invocation: true
+ ---
+ 
+ # Codebase Design
+diff --git a/mattpocock-skills/skills/engineering/diagnosing-bugs/SKILL.md b/mattpocock-skills/skills/engineering/diagnosing-bugs/SKILL.md
+index d039541..8681629 100644
+--- a/mattpocock-skills/skills/engineering/diagnosing-bugs/SKILL.md
++++ b/mattpocock-skills/skills/engineering/diagnosing-bugs/SKILL.md
+@@ -1,5 +1,5 @@
+ ---
+-name: diagnosing-bugs
++name: diagnose
+ description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+ ---
+ 
+@@ -135,4 +135,4 @@ Required before declaring done:
+ - [ ] Regression test passes (or absence of seam is documented)
+ - [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
+ - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
+-- [ ] The hypothesis that turned out correct is stated in the commit / PR message, so the next debugger learns
++- [ ] The hypothesis that turned out correct is stated in the commit message, so the next debugger learns
+diff --git a/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md b/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md
+index f1eabb5..8f5be64 100644
+--- a/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md
++++ b/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md
+@@ -1,17 +1,17 @@
+ ---
+-name: improve-codebase-architecture
+-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.
++name: arch-review
++description: Scan a codebase for deepening opportunities, list them in the reply, then grill through whichever one you pick.
+ disable-model-invocation: true
+ ---
+ 
+-# Improve Codebase Architecture
++# Architecture review
+ 
+ Surface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
+ 
+ This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+ 
+-- Call the Skill tool with "codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
+-- The domain language in `GLOSSARY.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
++- Call the Skill tool with "deep-modules" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
++- Where the project records its domain language or past decisions, those name good seams and settle what this command should not re-litigate.
+ 
+ ## Process
+ 
+@@ -22,8 +22,6 @@ This command is _informed_ by the project's domain model and built on a shared d
+ - If the user named a direction (a module, a subsystem, a pain point), take it, and skip the inference below.
+ - Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.
+ 
+-Read the project's domain glossary (`GLOSSARY.md`) and any ADRs in the area you're touching first.
+-
+ Then spawn a sub-agent with a fresh context window to walk the codebase. Don't follow rigid heuristics; explore organically and note where you experience friction:
+ 
+ - Where does understanding one concept require bouncing between many small modules?
+@@ -34,38 +32,26 @@ Then spawn a sub-agent with a fresh context window to walk the codebase. Don't f
+ 
+ Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
+ 
+-### 2. Present candidates as an HTML report
+-
+-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user (`xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows) and tell them the absolute path.
+-
+-The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals: use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
++### 2. Present candidates in your reply
+ 
+-For each candidate, render a card with:
++For each candidate, give:
+ 
+ - **Files**: which files/modules are involved
+ - **Problem**: why the current architecture is causing friction
+ - **Solution**: plain English description of what would change
+ - **Benefits**: explained in terms of locality and leverage, and how tests would improve
+-- **Before / After diagram**: side-by-side, custom-drawn, illustrating the shallowness and the deepening
+-- **Recommendation strength**: one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
++- **Recommendation strength**: `Strong`, `Worth exploring`, or `Speculative`
+ 
+-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
++End with a **Top recommendation**: which candidate you'd tackle first and why.
+ 
+-**Use GLOSSARY.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `GLOSSARY.md` defines "Order," talk about "the Order intake module," not "the FooBarHandler," and not "the Order service."
++Use the project's own domain terms where it has them, and the `deep-modules` vocabulary for the architecture.
+ 
+-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007, but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
++If a candidate contradicts a recorded decision, surface it only when the friction is real enough to warrant revisiting that decision, and say so in the candidate.
+ 
+-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+-
+-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
++Do NOT propose interfaces yet. After presenting them, ask the user: "Which of these would you like to explore?"
+ 
+ ### 3. Grilling loop
+ 
+ Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
+ 
+-Side effects happen inline as decisions crystallize; call the Skill tool with "domain-modeling" to keep the domain model current as you go:
+-
+-- **Naming a deepened module after a concept not in `GLOSSARY.md`?** Add the term to `GLOSSARY.md`. Create the file lazily if it doesn't exist.
+-- **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.
+-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons ("not worth it right now") and self-evident ones.
+-- **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "codebase-design" and use its design-it-twice parallel sub-agent pattern.
++If the user wants to explore alternative interfaces for the deepened module, call the Skill tool with "deep-modules" and use its design-it-twice parallel sub-agent pattern.
+diff --git a/mattpocock-skills/skills/productivity/handoff/SKILL.md b/mattpocock-skills/skills/productivity/handoff/SKILL.md
+index a224edc..22c9281 100644
+--- a/mattpocock-skills/skills/productivity/handoff/SKILL.md
++++ b/mattpocock-skills/skills/productivity/handoff/SKILL.md
+@@ -5,7 +5,7 @@ argument-hint: "What will the next session be used for?"
+ disable-model-invocation: true
+ ---
+ 
+-Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS (`$TMPDIR`, else `/tmp`; `%TEMP%` on Windows) - not the current workspace.
++Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save it as `handoff.md` in a task directory in the project scratchpad, and give the user its full path. The next agent takes it over with the `pickup` skill, which deletes it.
+ 
+ Include a "suggested skills" section in the document, naming which skills the next agent should call the Skill tool for.
+ 
+diff --git a/mattpocock-skills/skills/productivity/writing-for-agents/SKILL-MECHANICS.md b/mattpocock-skills/skills/productivity/writing-for-agents/SKILL-MECHANICS.md
+index 9cdbdb2..bf5d40a 100644
+--- a/mattpocock-skills/skills/productivity/writing-for-agents/SKILL-MECHANICS.md
++++ b/mattpocock-skills/skills/productivity/writing-for-agents/SKILL-MECHANICS.md
+@@ -1,6 +1,6 @@
+ # Skill mechanics
+ 
+-The skill-specific branch of [`writing-for-agents`](SKILL.md): what changes when the document is a skill (frontmatter, the invocation choice, and router skills). Everything else about writing it is the universal reference in `SKILL.md`.
++The skill-specific branch of [`agent-docs`](SKILL.md): what changes when the document is a skill (frontmatter, the invocation choice, and router skills). Everything else about writing it is the universal reference in `SKILL.md`.
+ 
+ ## Invocation
+ 
+diff --git a/mattpocock-skills/skills/productivity/writing-for-agents/SKILL.md b/mattpocock-skills/skills/productivity/writing-for-agents/SKILL.md
+index a37608d..2a768e7 100644
+--- a/mattpocock-skills/skills/productivity/writing-for-agents/SKILL.md
++++ b/mattpocock-skills/skills/productivity/writing-for-agents/SKILL.md
+@@ -1,5 +1,5 @@
+ ---
+-name: writing-for-agents
++name: agent-docs
+ description: Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md.
+ ---
+ 
+diff --git a/cursor-plugins/pstack/skills/arena/SKILL.md b/cursor-plugins/pstack/skills/arena/SKILL.md
+index 7580c3c..fb9d707 100644
+--- a/cursor-plugins/pstack/skills/arena/SKILL.md
++++ b/cursor-plugins/pstack/skills/arena/SKILL.md
+@@ -1,31 +1,29 @@
+ ---
+ name: arena
+-description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
++description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
+ disable-model-invocation: true
+ ---
+ 
+ # Arena
+ 
+-Open a todolist with one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify) before launching anything.
+-
+ ## Phase A: Frame
+ 
+ Every candidate gets the same prompt, so the prompt is the contract.
+ 
+ 1. State the artifact each candidate is producing.
+ 2. Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task. It is the picker's tool in Phase D. Candidates only see the task.
+-3. Pick the runners. Use the `arena runners` line in `~/.cursor/rules/pstack-models.mdc`. If the rule or that line is missing, default to one each on `claude-opus-5-5-xhigh` and `grok-4.7-xhigh-fast`. An `auto` or `inherit-parent` entry in this line means the parent model, so omit `model` for it. If the Task tool rejects a configured entry, run that seat on its family's default and say so. Families go by prefix: `claude-*`, and `grok-*` with `cursor-grok-*` and `composer-*`. A refused `composer-*` entry runs on `grok-4.7-xhigh-fast`. If the family has no default, or the Task tool rejects that default, use the closest valid slug of the same family from its error message, or drop the seat and say so when there is none. If dropped seats leave fewer than two runners, add runners until there are two, or one when the line has one entry. Run each added runner on a remaining runner's model, or omit `model` so it runs on the parent model when none remain, and say so. Spawn more runners when the arena covers multiple design directions. Use the same model N times when the work is generation-bound rather than judgment-sensitive. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
+-4. Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
++3. Pick the runners with the subagent tool's `model` parameter; invoking this skill is the request to set it. Default to at least one Claude and one OpenAI runner (`claude-agent/opus`, `openai/gpt-6.1-sol#high`). If a model is rejected, look up its current ID, or run that seat on the parent model and say so. Spawn more runners when the arena covers multiple design directions. Use the same model N times when the work is generation-bound rather than judgment-sensitive.
++4. Give each candidate its own output location (a git worktree where possible, otherwise a directory in the session scratchpad), per the **separate-before-serializing-shared-state** principle skill.
+ 
+ ## Phase B: Fan out
+ 
+-Spawn all N subagents in one message with `run_in_background: true`, each with the task, the path to the shared grounding, its own output path, and instructions to produce the artifact and a short rationale naming the alternatives it considered and what it rejected.
++Spawn all N subagents together in the background, each with the task, the path to the shared grounding, its own output path, and instructions to produce the artifact and a short rationale naming the alternatives it considered and what it rejected.
+ 
+ If a candidate produces no output, proceed with N-1 and note the dropout.
+ 
+ ## Phase C: Cross-judge
+ 
+-After all Phase B candidates complete, choose one model from the `arena cross-judge pool` line in `~/.cursor/rules/pstack-models.mdc`. If the rule or that line is missing, choose from `claude-opus-5-5-xhigh` and `grok-4.7-xhigh-fast`. Spawn one readonly judge subagent. The judge is never from the parent's family, as Phase A step 3 defines families. Try only the entries from another family, in pool order. An `auto` or `inherit-parent` entry is the parent model, so it never judges. With the default pool, a Claude parent gets `grok-4.7-xhigh-fast`. A parent from any other family gets `claude-opus-5-5-xhigh` first. If the Task tool rejects an entry, use a valid slug of the same model at the closest level or speed from the error message, or move to the next entry when there is none. If no entry from another family runs, try the default pool's entries from another family the same way. If none of those runs, skip the judge, pick the base alone in Phase D, and say so. If you do not know the parent's model, try the pool's real slugs in pool order and say that the family check did not run. The judge sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with your reading in Phase D. Don't spawn it while candidates are still writing.
++After all Phase B candidates complete, spawn one read-only judge subagent from the model family you are not running on, so its bias differs from yours. If no other family runs, skip the judge, pick the base alone in Phase D, and say so. The judge sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with your reading in Phase D. Spawn it only after the candidates have finished writing.
+ 
+ ## Phase D: Pick a base
+ 
+diff --git a/cursor-plugins/pstack/skills/benchmark-checklist/SKILL.md b/cursor-plugins/pstack/skills/benchmark-checklist/SKILL.md
+index e901d1f..9c0a3f1 100644
+--- a/cursor-plugins/pstack/skills/benchmark-checklist/SKILL.md
++++ b/cursor-plugins/pstack/skills/benchmark-checklist/SKILL.md
+@@ -1,12 +1,12 @@
+ ---
+-name: benchmark-checklist
++name: bench-check
+ description: "Vet a perf measurement (limiter, tuning, limits, errors, repeatability, relevance, and whether the work happened) before you report or act on it. Use when you run a benchmark or report a speedup or regression you measured."
+ disable-model-invocation: true
+ ---
+ 
+-# Benchmark checklist
++# Bench check
+ 
+-Use this when you produce a performance number: a PR's before and after, a regression claim, a hillclimb harness, or a library or config choice. Answer each question with evidence from a run, not a guess about the code.
++Use this when you produce a performance number: a before and after, a regression claim, a hillclimb harness, or a library or config choice. Answer each question with evidence from a run, not a guess about the code.
+ 
+ For a quick ballpark the user asked for, one run is enough. Still check questions 4 and 7, and say that it is one run. Skip the rest unless that run looks wrong. A choice between options is never a ballpark.
+ 
+@@ -31,9 +31,7 @@ For a quick ballpark the user asked for, one run is enough. Still check question
+ - Lead with the verdict: faster, slower, no measurable difference, or inconclusive.
+ - Give the number with its unit, the run count, the range, and the limiter. For example, "p50 41 ms → 33 ms, median of 7 runs per side, range 32 to 35 ms after, bound by JSON parsing on one core."
+ - Call the verdict inconclusive when you claim a difference but cannot name the limiter, when a side ran untuned, or when you could not check questions 4 and 7. Name the gap.
+-- Keep a PR body to one primary number, per the **Opening a PR** playbook. Put the runs, range, and limiter evidence in a linked artifact or notes file.
+ 
+ ## Other perf material
+ 
+-- Vet the **Perf issue** playbook's baseline before the playbook plans from it, and every number after that.
+ - Vet the **Hillclimb** playbook's harness before it is frozen. The frozen harness then prints error and work counts, so each keep-or-revert checks questions 4 and 7 for free.
+diff --git a/cursor-plugins/pstack/skills/blast-radius/SKILL.md b/cursor-plugins/pstack/skills/blast-radius/SKILL.md
+index b296cce..d9713c8 100644
+--- a/cursor-plugins/pstack/skills/blast-radius/SKILL.md
++++ b/cursor-plugins/pstack/skills/blast-radius/SKILL.md
+@@ -30,7 +30,7 @@ Step 4 is usually one small script that imports the same library the app ships a
+ 
+ ## Steps
+ 
+-1. Read the change. The diff, the symbols it adds, changes, and deletes, and what it now does differently, including the part the diff doesn't spell out. Use `why` step 2 to pull the PR and commits.
++1. Read the change. The diff, the symbols it adds, changes, and deletes, and what it now does differently, including the part the diff doesn't spell out. Use `why` step 2 to pull the commits.
+ 2. Find the one fact it's safe because of. Most changes that look risky are safe because of a single fact, like "this call only drops already-dead cache entries and does nothing else". Find that fact. If it holds, most risky cases are cleared at once. Spend your time here, not on a long list of maybes.
+ 3. Look where grep stops. Read the source of the library you call, and check its pinned version and any local patch. Work out when things run: microtasks, unmount and teardown, Solid versus React. Follow what a symbol search misses: the JSON an API returns, a DB column, a wire format, another language reading the same bytes, a feature flag, code three hops downstream.
+ 4. Be honest about each risk. Give it a real chance of happening and a real cost if it does. Keep the risks you confirmed. List the ones you checked and cleared separately. Same rules as `why`. Cite a real `file:line`, a search that finds nothing is still an answer, and never make up a caller or an API.
+diff --git a/cursor-plugins/pstack/skills/correct/SKILL.md b/cursor-plugins/pstack/skills/correct/SKILL.md
+index c45e06f..0af76c0 100644
+--- a/cursor-plugins/pstack/skills/correct/SKILL.md
++++ b/cursor-plugins/pstack/skills/correct/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: correct
+-description: "Find the mistakes agents keep repeating in this repo and make each one impossible. Try architecture first, then types, then a lint whose error names the fix, then a test, and write docs last. Prove each check fails on a real past mistake. Repeat this each time the operator corrects you. Use for /correct."
++description: "Find the mistakes agents keep repeating in this repo and make each one impossible. Try architecture first, then types, then a lint whose error names the fix, then a test, and write docs last. Prove each check fails on a real past mistake. Repeat this each time the operator corrects you."
+ disable-model-invocation: true
+ ---
+ 
+@@ -23,10 +23,10 @@ First, read recent commits, reverts, review comments, agent instruction files, a
+ 
+ ## Fix and prove
+ 
+-Then fix the most frequent classes now, one commit each. Prove each new check fails on a real past mistake. Run the same command locally and in CI. Exceptions go on the offending line with a reason, an expiry date, and a human's approval.
++Then fix the most frequent classes now, one commit each. Prove each new check fails on a real past mistake. Run the same command locally and in CI, where the repo has CI. Exceptions go on the offending line with a reason, an expiry date, and a human's approval.
+ 
+-## Keep the rule table
++## When the operator corrects you
+ 
+-Last, keep a table in the agent instruction file that pairs each rule with what enforces it. When the operator corrects you, fix the mistake and add the rule. If the rule was already there and nothing enforces it, that's a repeat, so fix it at the highest level in the same change. Drop a rule once its mistake can't happen.
++Fix the mistake, then fix its class at the highest level that works, in the same change. Drop an agent rule once its mistake can't happen.
+ 
+ **Reply:** each class with its evidence, the level you picked, and why a higher level didn't work.
+diff --git a/cursor-plugins/pstack/skills/create-verification-skill/SKILL.md b/cursor-plugins/pstack/skills/create-verification-skill/SKILL.md
+index 140d033..0c5a7c0 100644
+--- a/cursor-plugins/pstack/skills/create-verification-skill/SKILL.md
++++ b/cursor-plugins/pstack/skills/create-verification-skill/SKILL.md
+@@ -1,12 +1,12 @@
+ ---
+-name: create-verification-skill
+-description: "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior."
++name: build-verifier
++description: "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior."
+ disable-model-invocation: true
+ ---
+ 
+ # Create a verification skill
+ 
+-Every serious project needs a scripted way to drive the real app and prove behavior: launch it, exercise a feature the way a user would, and capture evidence. This skill generates that as a project-local skill (`.cursor/skills/verify-<app>/`) tailored to the repo. You write the generator's output for the next agent, not for a human: it will be read cold, mid-task, by an agent that has never seen the app.
++Every serious project needs a scripted way to drive the real app and prove behavior: launch it, exercise a feature the way a user would, and capture evidence. This skill generates that as a project-local skill (`.opencode/skills/verify-<app>/`) tailored to the repo. You write the generator's output for the next agent, not for a human: it will be read cold, mid-task, by an agent that has never seen the app.
+ 
+ ## 1. Interview the repo, not the user
+ 
+@@ -22,18 +22,18 @@ If the checkout doesn't build or start as-is, fix that first (or report it preci
+ 
+ ## 2. Generate the skill
+ 
+-Write `.cursor/skills/verify-<app>/SKILL.md` with YAML frontmatter (`name: verify-<app>` and a `description` that names the app, the surface, and when to reach for it — without frontmatter the skill never registers) and these sections, each grounded in what the interview actually found (no placeholders left):
++Write `.opencode/skills/verify-<app>/SKILL.md` with YAML frontmatter (`name: verify-<app>` and a `description` that names the app, the surface, and when to reach for it — without frontmatter the skill never registers) and these sections, each grounded in what the interview actually found (no placeholders left):
+ 
+ - **Launch:** the exact command that starts the app for verification, and how to tell it's ready (a log line, a prompt). Launch must reach a usable state from an empty data dir, including any migrations and seed data. Ready means usable, not just that a process answers. A database health check can pass while its init scripts are still running. Include teardown. For a short-lived CLI or TUI there is no server to keep alive: launch means build the binary (or install deps) once, then start each drive in its own isolated PTY or tmux session.
+ - **Doctor:** one read-only check that answers "is this instance worth driving?" — process up, right version/build, port owned by us, auth valid. An agent runs this first whenever anything looks off.
+ - **Drive:** the harness recipe with real selectors/commands from this repo, not examples. Prefer stable handles (ARIA labels, data attributes, prompt strings, route paths) over coordinates and tab order.
+-- **Evidence:** what to capture for a proof and where it goes. State the proof standards: exercise the real user path, not internal setters or test-only endpoints; capture the action and the resulting state, not just the final screen; verify side effects (files written, rows inserted, messages sent) alongside what's visible; mocks only where a production boundary already isolates the external system. When the safe path is a dry-run or test mode, verify what it actually skips by observing (files, network, git refs) rather than trusting its name: some dry-runs still touch the network or open a browser.
++- **Evidence:** what to capture for a proof and where it goes: a scratchpad, outside the repo. State the proof standards: exercise the real user path, not internal setters or test-only endpoints; capture the action and the resulting state, not just the final screen; verify side effects (files written, rows inserted, messages sent) alongside what's visible; mocks only where a production boundary already isolates the external system. When the safe path is a dry-run or test mode, verify what it actually skips by observing (files, network, git refs) rather than trusting its name: some dry-runs still touch the network or open a browser.
+ - **Cleanup:** how to tear down instances the run created. Never kill by process name; kill what you started. Cleanup removes instances and scratch state, never the evidence: proof artifacts survive the teardown, in a location the skill names.
+ - **Helpers:** any script the skill ships is executable and its invocation is shown in the skill body. A helper the reader has to reverse-engineer is not a helper.
+ 
+ ## 3. Seed the feature map
+ 
+-Create `.cursor/skills/verify-<app>/features/README.md` plus one file per user-facing feature you can identify (aim for the top 3-5 to start, from routes, commands, menus, or docs). Follow the shape in [`references/feature-map-example/`](references/feature-map-example/), with a README index and one file per feature. Each file answers, from the user's point of view: what the feature is, how to reach it, how to drive it with the harness, and what observable end state proves it works. The four H2s are `Sub-features`, `How to get to it (user POV)`, `Driving it with <harness>`, and `Gotchas`. If the seed data lacks a precondition that a journey needs, the journey reports a failure and the reason goes in that feature's `Gotchas`. Never weaken the journey to make it pass. The map is the repo's maintained verification source; a proof that drives one convenient entry point is incomplete when the map lists others.
++Create `.opencode/skills/verify-<app>/features/README.md` plus one file per user-facing feature you can identify (aim for the top 3-5 to start, from routes, commands, menus, or docs). Follow the shape in [`references/feature-map-example/`](references/feature-map-example/), with a README index and one file per feature. Each file answers, from the user's point of view: what the feature is, how to reach it, how to drive it with the harness, and what observable end state proves it works. The four H2s are `Sub-features`, `How to get to it (user POV)`, `Driving it with <harness>`, and `Gotchas`. If the seed data lacks a precondition that a journey needs, the journey reports a failure and the reason goes in that feature's `Gotchas`. Never weaken the journey to make it pass. The map is the repo's maintained verification source; a proof that drives one convenient entry point is incomplete when the map lists others.
+ 
+ ## 4. Prove the generated skill before handing it over
+ 
+@@ -41,4 +41,4 @@ Run its own instructions end to end once: launch, doctor, drive ONE mapped featu
+ 
+ ## 5. Offer the maintenance loop
+ 
+-Point the user at `/maintain-verification-skill` for keeping the map honest as the app changes. Suggest a cadence only if they ask.
++Point the user at the `update-verifier` skill for keeping the map honest as the app changes. Suggest a cadence only if they ask.
+diff --git a/cursor-plugins/pstack/skills/how/SKILL.md b/cursor-plugins/pstack/skills/how/SKILL.md
+index 67edc34..0c044dc 100644
+--- a/cursor-plugins/pstack/skills/how/SKILL.md
++++ b/cursor-plugins/pstack/skills/how/SKILL.md
+@@ -8,7 +8,7 @@ disable-model-invocation: true
+ 
+ Explore the codebase to answer "how does X work?" questions. Produce architectural explanations at the level of a senior engineer onboarding onto a subsystem, enough to build a working mental model, not so much that it reads like annotated source code.
+ 
+-Every spawn is a Task subagent with `subagent_type: generalPurpose` and `readonly: true`. Explorers use the `how explorer` line in the `pstack-models.mdc` rule (default `grok-4.7-xhigh-fast`), and every explainer uses the `how explainer` line (default `claude-opus-5-5-xhigh`). Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
++Every spawn is a read-only `explore` subagent on the session's model.
+ 
+ ## 1. Assess complexity
+ 
+diff --git a/cursor-plugins/pstack/skills/ketchup/SKILL.md b/cursor-plugins/pstack/skills/ketchup/SKILL.md
+index 9eef27f..896e705 100644
+--- a/cursor-plugins/pstack/skills/ketchup/SKILL.md
++++ b/cursor-plugins/pstack/skills/ketchup/SKILL.md
+@@ -1,43 +1,33 @@
+ ---
+-name: ketchup
+-description: "Catch the user up on what changed in this chat since their last message, in plain words and small visuals. List every item waiting on them with what they need to decide it from the reply alone. Use for /ketchup."
++name: sitrep
++description: "Catch the user up on what changed in this chat since their last message, in plain words. List every item waiting on them with what they need to decide it from the reply alone."
+ disable-model-invocation: true
+ ---
+ 
+-# Ketchup
++# Sitrep
+ 
+-Catch the user up on what changed in this chat since the last message they wrote before `/ketchup`, and help them understand each change, not only where it stands. Then lay out every call waiting on them so they can make it from your reply alone. Notifications and subagent results are not their messages. Assume the user remembers their last message and nothing after it.
++Catch the user up on what changed in this chat since the last message they wrote before `@sitrep`, and help them understand each change, not only where it stands. Then lay out every call waiting on them so they can make it from your reply alone. Notifications and subagent results are not their messages. Assume the user remembers their last message and nothing after it.
+ 
+-Use [`/bro`](../bro/SKILL.md)'s voice, not its task: plain words, short sentences, no jargon, like one person catching up another. Say what changed for the user, not how you did it. Say "the tests pass", not "CI is green". Leave out hashes, file paths, commands, build numbers, and test counts unless the user needs one to act. Call each PR, branch, or agent by a name the user would know, not by a label you invented. If a fact needs context to make sense, give the context or leave the fact out.
++Use the `bro` skill's voice, not its task: plain words, short sentences, no jargon, like one person catching up another. Say what changed for the user, not how you did it. Say "the tests pass", not "CI is green". Leave out hashes, file paths, commands, build numbers, and test counts unless the user needs one to act. Call each branch or agent by a name the user would know, not by a label you invented. If a fact needs context to make sense, give the context or leave the fact out.
+ 
+ ## Gather what changed
+ 
+-Keep this turn read-only. Make visuals only from what you already have: do not change code, start an app or a job, or post anything. Collect your own work since that message, reports from subagents, and messages from anyone else in this chat. Check the current state of each PR, CI run, or agent this chat touched. Check each number you will show against the facts it comes from, and say so when you correct one.
++Keep this turn read-only. Do not change code, start an app or a job, or post anything. Collect your own work since that message, reports from subagents, and messages from anyone else in this chat. Check the current state of each branch, run, or agent this chat touched. Check each number you will show against the facts it comes from, and say so when you correct one.
+ 
+ An action item is a call or step only the user can take, such as a product choice, an approval, an irreversible action, or access you lack. Include any still waiting on the user, even one raised before their last message. Work you can still do yourself is not an action item. Never make up a call to fill the reply. A step the user did not ask for and the work does not need is not an action item, unless it is irreversible and waiting on the user: give it one line and no visual.
+ 
+-One call can cover many items, such as each PR in a set awaiting merge. For each item, collect its link, what it changes for users, the evidence behind your pick, its risk, and your pick. Write "unknown" for a fact the call needs that you do not know. Leave out a link you do not have.
++One call can cover many items, such as each branch in a set awaiting merge. For each item, collect what it changes for users, the evidence behind your pick, its risk, and your pick. Write "unknown" for a fact the call needs that you do not know.
+ 
+ ## Write the reply
+ 
+-Spend words on the calls, not on the story. Keep what happened under 100 words, not counting pictures, and shorter when less happened. Leave out work that changed nothing for the user. Give each item about 30 words. The reply grows with the number of items: two items need well under 150 words in all, not counting pictures, and thirty need far more. Never cut items or shrink them to stay under a word count: no count in place of a list, and no link in place of an item. A link can add depth, but the reply alone must be enough to decide.
++Spend words on the calls, not on the story. Keep what happened under 100 words, and shorter when less happened. Leave out work that changed nothing for the user. Give each item about 30 words. The reply grows with the number of items: two items need well under 150 words in all, and thirty need far more. Never cut items or shrink them to stay under a word count: no count in place of a list, and no link in place of an item. A link can add depth, but the reply alone must be enough to decide.
+ 
+ Open with one short sentence that names what waits on the user, or says nothing does. The action items give the detail. If nothing happened and nothing waits on the user, say so and stop.
+ 
+-Then show what happened, pictures first. Embed inline the screenshots and videos the work produced, then any diagram that explains a change. Then sum up in one short bullet per thing the user asked for: what came of it, and whether it is done, still running, failed, or not checked. Write each line the way you would say it out loud: "Search was slow from a missing index", not "Search review: done" or "Slow search: missing index". Name any bug found and fixed on the way. Each line must stay true when read alone. Never mark something done that still waits on the user, and leave out anything the action items say. Under the summary, give at most three short lines that change what the user knows or must do. Then name in one line any work left that you can do yourself.
++Then sum up in one short bullet per thing the user asked for: what came of it, and whether it is done, still running, failed, or not checked. Write each line the way you would say it out loud: "Search was slow from a missing index", not "Search review: done" or "Slow search: missing index". Name any bug found and fixed on the way. Each line must stay true when read alone. Never mark something done that still waits on the user, and leave out anything the action items say. Under the summary, give at most three short lines that change what the user knows or must do. Then name in one line any work left that you can do yourself.
+ 
+-Then list the action items. Ask the call the user owns, such as merge, approve, or pick, and give your pick. A step you would take first goes in your pick. So does anything that must happen first, and anything that cannot be undone. Give the number or link of each PR, issue, or agent a call is about, also in a call between options.
++Then list the action items. Ask the call the user owns, such as merge, approve, or pick, and give your pick. A step you would take first goes in your pick. So does anything that must happen first, and anything that cannot be undone. Name each branch or agent a call is about, also in a call between options.
+ 
+-Fit the shape to the call. A call about one item is one bullet: the call, your pick, what it changes for users, the evidence behind your pick, and its risk, with the item named once. When items share a call, write the call and your pick once, then give each item its own bullet, riskiest first: its link and name, what it changes for users, the evidence behind your pick, and its risk. Name an item's pick only where it differs from the call's. Give each item's risk even when it is low, such as "Low risk: only the colors change." Say what waiting costs only when it is more than a delay, such as a deadline or lost data.
++Fit the shape to the call. A call about one item is one bullet: the call, your pick, what it changes for users, the evidence behind your pick, and its risk, with the item named once. When items share a call, write the call and your pick once, then give each item its own bullet, riskiest first: its name, what it changes for users, the evidence behind your pick, and its risk. Name an item's pick only where it differs from the call's. Give each item's risk even when it is low, such as "Low risk: only the colors change." Say what waiting costs only when it is more than a delay, such as a deadline or lost data.
+ 
+-For a call between options, give every option the work weighed, each with what it gets the user and what it costs, and the current state when there is one. Those costs are the call's risk, so add no separate risk line. When the screenshots above show the options, write each option's gain and cost under its screenshot.
+-
+-## Visuals
+-
+-A visual is a picture: a screenshot, a video, a Mermaid diagram, a chart or diagram from `/visualize`, or a generated image. A Markdown table is not a visual, even with before and after columns.
+-
+-When something is easier to grasp as a picture than as sentences, draw it: how a design or system works, a PR stack or dependency chain with each PR's state, a before and after of a fix, or options side by side. Never draw a status list, a list of action items, or boxes with nothing connecting them. Never give a fact twice, in text or across visuals.
+-
+-Keep each visual small enough to read at a glance: at most six boxes, with at most eight words in each. Write labels as plain words a person would say, not tags like "Tests: pass". A fact that needs a sentence belongs in the text, or nowhere.
+-
+-Embed screenshots and videos inline when the change is visible, not only as links. If a visible change has none, mark its summary line "No screenshot yet," and say there what changed on screen. Draw diagrams and charts from facts you have: a Mermaid diagram for how things connect and a `/visualize` chart for numbers. Never invent a number, and never draw or generate a picture of a screen you did not capture. Link only artifacts that exist.
++For a call between options, give every option the work weighed, each with what it gets the user and what it costs, and the current state when there is one. Those costs are the call's risk, so add no separate risk line.
+diff --git a/cursor-plugins/pstack/skills/maintain-verification-skill/SKILL.md b/cursor-plugins/pstack/skills/maintain-verification-skill/SKILL.md
+index a2680b9..8a2daeb 100644
+--- a/cursor-plugins/pstack/skills/maintain-verification-skill/SKILL.md
++++ b/cursor-plugins/pstack/skills/maintain-verification-skill/SKILL.md
+@@ -1,19 +1,19 @@
+ ---
+-name: maintain-verification-skill
+-description: "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Use for /maintain-verification-skill or \"audit the verify skill\"."
++name: update-verifier
++description: "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one commit of proven corrections. Use for \"audit the verify skill\"."
+ disable-model-invocation: true
+ ---
+ 
+ # Maintain a verification skill
+ 
+-A feature map rots the moment the app changes. This skill is the upkeep loop for a skill generated by `/create-verification-skill` (or any project-local verification skill with a feature map). The unit of rigor is the feature, not every sentence: cover every feature file from source and exercise every feature live, without terminalising every bullet.
++A feature map rots the moment the app changes. This skill is the upkeep loop for a skill generated by the `build-verifier` skill (or any project-local verification skill with a feature map). The unit of rigor is the feature, not every sentence: cover every feature file from source and exercise every feature live, without terminalising every bullet.
+ 
+ ## Outcomes
+ 
+ Pick one, and say which:
+ 
+-- **clean** — every feature got source and live coverage; nothing worth shipping. No branch, no PR.
+-- **changed** — one PR ships proven doc, harness, or map corrections.
++- **clean** — every feature got source and live coverage; nothing worth shipping. No commit.
++- **changed** — one commit ships proven doc, harness, or map corrections.
+ - **blocked** — coverage could not finish or a proven fix could not ship safely. Say exactly what blocked it.
+ 
+ ## Edit scope
+@@ -22,7 +22,7 @@ Only edit the verification skill's own directory (its SKILL.md, features/, and a
+ 
+ ## Pass
+ 
+-0. **Locate the target.** Find the verification skill to maintain: the project-local skill whose body has launch/drive sections and a feature map (usually `.cursor/skills/verify-*/`). Several candidates → ask which one; none → stop and point at `/create-verification-skill` instead of inventing a target.
++0. **Locate the target.** Find the verification skill to maintain: the project-local skill whose body has launch/drive sections and a feature map (usually `.opencode/skills/verify-*/`). Several candidates → ask which one; none → stop and point at the `build-verifier` skill instead of inventing a target.
+ 
+ 1. **Index hygiene.** Read the feature map README and glob its sibling files. Fix missing, extra, duplicate, or dead entries. Lightweight; no generated inventory.
+ 
+@@ -32,8 +32,8 @@ Only edit the verification skill's own directory (its SKILL.md, features/, and a
+ 
+ 4. **Live pass.** Required even when source looks clean. The coordinator owns all driving; follow the verification skill's own launch model — one long-lived instance driven serially for servers and UIs, or a fresh isolated session per drive for short-lived CLIs (the skill's Launch section decides, not this one). Exercise every feature at least once, and hold three invariants the whole pass, whatever the failure: (1) never drive an instance you haven't health-checked since it last did something surprising — doctor before first drive, doctor on each fresh session where sessions are the unit, doctor again after any failed drive, and where doctor can't see the failure (a wedged UI state on a healthy process), reset to a known state or relaunch rather than hoping; (2) evidence captured so far survives every cleanup, checked at its named location, not assumed; (3) nothing a drive started outlives that drive's usefulness — failed-iteration residue is cleaned whether the session is stuck, exited, or shared (for a shared instance, clean the residue, not the instance). A doctor failure caused by skill drift is drift: fix it under edit scope and retry once — restart whatever the fix invalidated, nothing more — before calling the pass `blocked`. A feature that can't be reached is `verified-unreachable` only with the concrete prerequisite (auth, entitlement, OS, external state) and the route attempted; if the map omits that prerequisite, that's drift. Any harness fix from triage gets re-driven live before it ships. Final teardown happens after the last drive of the run — including those re-proofs — so nothing outlives the run (evidence stays, per the skill).
+ 
+-5. **Triage.** Wrong or missing user-POV description → doc drift, fix it. Working behavior the harness can't drive → harness gap, fix it; a harness fix follows the same helpers rule as generation (scripts executable, invocation documented in the skill body). App behavior that's actually broken → product gap; record it for the user, keep it out of this PR.
++5. **Triage.** Wrong or missing user-POV description → doc drift, fix it. Working behavior the harness can't drive → harness gap, fix it; a harness fix follows the same helpers rule as generation (scripts executable, invocation documented in the skill body). App behavior that's actually broken → product gap; record it for the user, keep it out of this commit.
+ 
+-6. **Ship or stop.** For changed: one PR of proven corrections, re-read every changed file first. For clean or blocked: no PR, report the outcome and the coverage honestly.
++6. **Ship or stop.** For changed: one commit of proven corrections, re-read every changed file first. For clean or blocked: no commit, report the outcome and the coverage honestly.
+ 
+ Keep concise run notes (features covered, unreachable prerequisites, confirmed drift, outcome) in a scratch location; don't commit them.
+diff --git a/cursor-plugins/pstack/skills/poteto-mode/playbooks/hillclimb.md b/cursor-plugins/pstack/skills/poteto-mode/playbooks/hillclimb.md
+index e9cf267..16c93d2 100644
+--- a/cursor-plugins/pstack/skills/poteto-mode/playbooks/hillclimb.md
++++ b/cursor-plugins/pstack/skills/poteto-mode/playbooks/hillclimb.md
+@@ -1,21 +1,26 @@
++---
++name: hillclimb
++description: "Sustained, iterative improvement of one measurable thing against a target: one change, one measurement, keep or revert."
++disable-model-invocation: true
++---
++
+ ### Hillclimb
+ 
+-**You own the metric and the experiment's integrity. Supervise and review. Delegate the attempts.** For sustained, iterative improvement of one measurable thing against a target. A one-off fix is Bug fix or Perf issue. This is the loop.
++**You own the metric and the experiment's integrity. Supervise and review. Delegate the attempts.** For sustained, iterative improvement of one measurable thing against a target. A one-off fix doesn't need this loop.
+ 
+ Core discipline: one change, one measurement, keep or revert. Never stack untested changes, and never claim a win from code inspection (the **prove-it-works** principle skill).
+ 
+ 1. Ground the workload and architecture before choosing the metric. Run the **how** skill over the target, name the realistic workload dimensions that can move the result (data size, history, state, concurrency), and select a case that reproduces the user's complaint. If no case reproduces it, fix the repro instead of hillclimbing. Then fix one metric, the direction that counts as better, and a checkable stop predicate that pairs a target with a floor on attempts so a lucky early win can't end the run (the example "at least 50% better than baseline and at least 10 iterations" is this shape). Use the user's numbers when given, otherwise agree them.
+-2. Build the measurement harness, prove its sensitivity, then freeze it (the **build-the-lever** principle skill). Run contrasting realistic workloads and confirm the target case reproduces the symptom while easier cases separate as expected. If the harness cannot distinguish them, revise the workload or metric. Vet the harness with the **benchmark-checklist** skill before you freeze it, and make it print its error count and a count of the work done. Once frozen, one repeatable command emits the metric, sampled enough to clear the noise (median of N, not a single run). Record the baseline metric and a green run of the regression gate (the tests that must keep passing) before any change.
+-3. Open the decision log via the **show-me-your-work** skill. A `decision.tsv`, one row per attempt: id, hypothesis, change, before, after, delta, tests, verdict (kept or reverted), note. Read it before each attempt. Keep it out of the tree (gitignored).
+-4. Ground each hypothesis in the architecture model from step 1, so it names a specific mechanism ("defer X off the boot path because it blocks first paint"), not "try memoizing something". For a perf metric, order hypotheses by the performance mantras in step 2 of the Perf issue playbook (`playbooks/perf-issue.md`). Borrow only their order, not that step's stop rule.
++2. Build the measurement harness, prove its sensitivity, then freeze it (the **build-the-lever** principle skill). Run contrasting realistic workloads and confirm the target case reproduces the symptom while easier cases separate as expected. If the harness cannot distinguish them, revise the workload or metric. Vet the harness with the **bench-check** skill before you freeze it, and make it print its error count and a count of the work done. Once frozen, one repeatable command emits the metric, sampled enough to clear the noise (median of N, not a single run). Record the baseline metric and a green run of the regression gate (the tests that must keep passing) before any change.
++3. Keep a short list of rejected attempts in the session scratchpad: hypothesis, change, before, after, why it failed. Git holds the kept ones. Read the list before each attempt and give it to the worker, so nobody retries a dead idea. It dies with the session.
++4. Ground each hypothesis in the architecture model from step 1, so it names a specific mechanism ("defer X off the boot path because it blocks first paint"), not "try memoizing something".
+ 5. Loop, one hypothesis per iteration:
+-   - Hand the change to a subagent using your configured hillclimb model (default `grok-4.7-xhigh-fast`) with a tight scope. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section. Supervise and review the diff rather than typing it (the **guard-the-context-window** principle skill). When several independent hypotheses are live, fan them to parallel subagents, each in its own worktree (the **separate-before-serializing-shared-state** principle skill).
++   - Hand the change to a subagent with a tight scope. Supervise and review the diff rather than typing it (the **guard-the-context-window** principle skill). When several independent hypotheses are live, fan them to parallel subagents, each in its own worktree (the **separate-before-serializing-shared-state** principle skill).
+    - Measure before and after with the frozen harness, and run the regression gate.
+    - Accept only when the metric moves past noise and the gate stays green. Otherwise revert the change in full. A tweak that "might help" is not kept.
+-   - One commit per accepted fix, staging only the files you changed (`git add <files>`, never `-A`). Log the row either way, kept or reverted.
+-   Each iteration ends in a check before the next begins (the **sequence-verifiable-units** principle skill). If the run is unattended, borrow only the wake mechanism from the Autonomous run playbook (`playbooks/autonomous-run.md`), not its stop rule.
++   - One commit per accepted fix, staging only the files you changed (`git add <files>`, never `-A`). Add a rejected attempt to the list.
++   Each iteration ends in a check before the next begins (the **sequence-verifiable-units** principle skill). If the run is unattended, stay active through background subagents: their completion notices wake you, and ending your turn with none running ends the run.
+ 6. Push past the first plateau. On a stall, several rejects in a row, pivot category, combine near-misses, re-read the source, or try something more radical before concluding the hill is climbed. Correctness and simplicity outrank the number. Revert a win that breaks behavior, and keep a simplification that holds the number (the **laziness-protocol** principle skill).
+ 7. Stop when the predicate is met, or when the remaining ideas are marginal and not worth their cost. Don't relax the predicate to meet it, and don't quit while cheap untried hypotheses remain. If you are stuck, surface it instead of spinning.
+-8. Run **Opening a PR** with the accepted commits stacked in the order they landed.
+ 
+-**Reply:** the metric and target, baseline to final with the percent delta, iterations run (kept vs reverted), each accepted fix on one line, the `decision.tsv` path, and the best idea you would try next if pushed further.
++**Reply:** the metric and target, baseline to final with the percent delta, iterations run (kept vs reverted), each accepted fix on one line, and the best idea you would try next if pushed further.
+diff --git a/cursor-plugins/pstack/skills/principle-attack-the-premise/SKILL.md b/cursor-plugins/pstack/skills/principle-attack-the-premise/SKILL.md
+index e9a6d49..b565774 100644
+--- a/cursor-plugins/pstack/skills/principle-attack-the-premise/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-attack-the-premise/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-attack-the-premise
+ description: "Apply when two or more fixes that share one premise have failed the same gate. Write the premise down and test it directly before you write another fix that assumes it."
+-disable-model-invocation: true
+ ---
+ 
+ # Attack the Premise
+diff --git a/cursor-plugins/pstack/skills/principle-encode-lessons-in-structure/SKILL.md b/cursor-plugins/pstack/skills/principle-encode-lessons-in-structure/SKILL.md
+index 4a96f77..d04e8b0 100644
+--- a/cursor-plugins/pstack/skills/principle-encode-lessons-in-structure/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-encode-lessons-in-structure/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-encode-lessons-in-structure
+ description: "Apply when you catch yourself writing the same instruction a second time, or notice a recurring correction. Encode the rule as a lint, metadata flag, runtime check, or script instead of more text."
+-disable-model-invocation: true
+ ---
+ 
+ # Encode Lessons in Structure
+diff --git a/cursor-plugins/pstack/skills/principle-explain-the-number/SKILL.md b/cursor-plugins/pstack/skills/principle-explain-the-number/SKILL.md
+index 3948ad3..c5eb3cc 100644
+--- a/cursor-plugins/pstack/skills/principle-explain-the-number/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-explain-the-number/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-explain-the-number
+ description: "Apply before you measure, and before you trust, report, or act on a number you measured: a speedup, a regression, a throughput, a latency, or an eval result. Find what limits it, and rule out that it measured something other than the work you think."
+-disable-model-invocation: true
+ ---
+ 
+ # Explain the Number
+@@ -11,7 +10,7 @@ disable-model-invocation: true
+ - **List what else the number could be measuring, and rule out each one with evidence.** The usual suspects are errors, skipped or cached work, code that never ran, an untuned side (one left on default settings), noise, and a piece too small to matter end to end.
+ - **Keep the evidence with the number.** Put the run count, the spread, and the limiter in the notes or a linked artifact.
+ 
+-For a performance number, run the full procedure with the [benchmark-checklist](../benchmark-checklist/SKILL.md) skill. For an eval result, ask the same of the trials: did every run do the task, does the gap hold across trials and models, and does the scenario matter.
++For a performance number, run the full procedure with the `bench-check` skill. For an eval result, ask the same of the trials: did every run do the task, does the gap hold across trials and models, and does the scenario matter.
+ 
+ You skipped this when a run started without the result that would change a decision, when the evidence behind a number has no run count, no spread, or no named limiter, or when the time saved is larger than the time the changed piece took.
+ 
+diff --git a/cursor-plugins/pstack/skills/principle-fix-root-causes/SKILL.md b/cursor-plugins/pstack/skills/principle-fix-root-causes/SKILL.md
+index 14fc189..5046e6f 100644
+--- a/cursor-plugins/pstack/skills/principle-fix-root-causes/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-fix-root-causes/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-fix-root-causes
+ description: "Apply when debugging. Trace each symptom back to the first place the system went wrong and fix it there. A guard is a fix only when the state it handles is legitimate."
+-disable-model-invocation: true
+ ---
+ 
+ # Fix Root Causes
+diff --git a/cursor-plugins/pstack/skills/principle-make-operations-idempotent/SKILL.md b/cursor-plugins/pstack/skills/principle-make-operations-idempotent/SKILL.md
+index c93f323..46e376b 100644
+--- a/cursor-plugins/pstack/skills/principle-make-operations-idempotent/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-make-operations-idempotent/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-make-operations-idempotent
+ description: "Apply when designing commands, lifecycle steps, or processing loops that run amid crashes, restarts, and retries. Converge to the same end state regardless of partial prior runs."
+-disable-model-invocation: true
+ ---
+ 
+ # Make Operations Idempotent
+diff --git a/cursor-plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md b/cursor-plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md
+index 57ddd7b..15960e4 100644
+--- a/cursor-plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-migrate-callers-then-delete-legacy-apis
+ description: "Apply when introducing a new internal API while old callers still exist. Migrate callers and delete the old API in the same wave instead of preserving compatibility layers."
+-disable-model-invocation: true
+ ---
+ 
+ # Migrate Callers Then Delete Legacy APIs
+diff --git a/cursor-plugins/pstack/skills/principle-prove-it-works/SKILL.md b/cursor-plugins/pstack/skills/principle-prove-it-works/SKILL.md
+index 5dc14a3..9b239e8 100644
+--- a/cursor-plugins/pstack/skills/principle-prove-it-works/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-prove-it-works/SKILL.md
+@@ -19,4 +19,4 @@ Check the real thing, not a proxy:
+ 
+ The strongest proof is a deterministic script that re-runs the same comparison, not a one-time eyeball. Write the script, run it, and keep its output as an artifact a reviewer can re-run instead of trusting your word.
+ 
+-Keep the artifact visible for the human. Commit it only for large or complex work where the trail has to be auditable later, like a big port or migration (the **show-me-your-work** skill).
++Keep the artifact in a scratchpad and name its path. Commit the script only when it outlives the task.
+diff --git a/cursor-plugins/pstack/skills/principle-separate-before-serializing-shared-state/SKILL.md b/cursor-plugins/pstack/skills/principle-separate-before-serializing-shared-state/SKILL.md
+index ff93b4a..7c9047c 100644
+--- a/cursor-plugins/pstack/skills/principle-separate-before-serializing-shared-state/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-separate-before-serializing-shared-state/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-separate-before-serializing-shared-state
+ description: "Apply when concurrent actors might write to the same file, branch, key, or state object. Eliminate the sharing first; serialize structurally only when one shared writer is a real invariant."
+-disable-model-invocation: true
+ ---
+ 
+ # Separate Before Serializing Shared State
+diff --git a/cursor-plugins/pstack/skills/principle-sequence-verifiable-units/SKILL.md b/cursor-plugins/pstack/skills/principle-sequence-verifiable-units/SKILL.md
+index 9863712..2e7daaf 100644
+--- a/cursor-plugins/pstack/skills/principle-sequence-verifiable-units/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-sequence-verifiable-units/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: principle-sequence-verifiable-units
+-description: "Apply to multi-step work (sweeps, migrations, runs of similar edits) and to how you stack commits and PRs. Break work into small units that each end in a verifiable state, check each before the next, and order delivery so the sequence proves itself to a reviewer."
++description: "Apply to multi-step work (sweeps, migrations, runs of similar edits) and to how you stack commits. Break work into small units that each end in a verifiable state, check each before the next, and order delivery so the sequence proves itself to a reviewer."
+ disable-model-invocation: true
+ ---
+ 
+@@ -12,6 +12,6 @@ Order work as a sequence of small units, each ending in a state you can check, a
+ 
+ **Execution.** In a sweep, migration, or any run of similar edits, verify each change before starting the next. Each unit is a before/after bracket: known-good state, one change, run the check, then proceed. Rebase onto clean trunk first so every check measures against the real baseline. When a lever does the edits, the per-unit check is nearly free. Run it anyway.
+ 
+-**Delivery.** Stack commits and PRs in the order that proves the work. The canonical shape is the failing test first, then the fix on top. Other story orders are a subtraction before the reshape, a baseline capture before the treatment, the scaffold before the feature. Each commit lands on its own and the sequence reads as an argument.
++**Delivery.** Stack commits in the order that proves the work. The canonical shape is the failing test first, then the fix on top. Other story orders are a subtraction before the reshape, a baseline capture before the treatment, the scaffold before the feature. Each commit lands on its own and the sequence reads as an argument.
+ 
+ The sequencing complement to the **prove-it-works** principle skill, which keeps each check real, and the **build-the-lever** principle skill, which makes the per-unit check cheap.
+diff --git a/cursor-plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md b/cursor-plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md
+index 78c9389..cc633a0 100644
+--- a/cursor-plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md
++++ b/cursor-plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: principle-test-behavior-not-implementation
+ description: "Apply when you write, change, or keep a test. Assert what the code's users can observe, so that the test fails when that behavior breaks and keeps passing when only the internals change."
+-disable-model-invocation: true
+ ---
+ 
+ # Test Behavior, Not Implementation
+diff --git a/cursor-plugins/pstack/skills/unslop/SKILL.md b/cursor-plugins/pstack/skills/unslop/SKILL.md
+index 97f5b64..1dbc49d 100644
+--- a/cursor-plugins/pstack/skills/unslop/SKILL.md
++++ b/cursor-plugins/pstack/skills/unslop/SKILL.md
+@@ -1,7 +1,6 @@
+ ---
+ name: unslop
+-description: Cut AI tells from any writing.
+-disable-model-invocation: true
++description: Cut AI tells from writing. Use when writing or editing docs, READMEs, or commit messages.
+ ---
+ 
+ # Unslop
+diff --git a/cursor-plugins/pstack/skills/why/SKILL.md b/cursor-plugins/pstack/skills/why/SKILL.md
+index b5fe93f..4443e1e 100644
+--- a/cursor-plugins/pstack/skills/why/SKILL.md
++++ b/cursor-plugins/pstack/skills/why/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: why
+-description: "Use for 'why does X work this way', 'why we picked Y', design rationale, regressions, postmortems, or data-backed thresholds. Discovers available MCPs and queries each evidence category (source control, issue tracker, long-form docs, real-time chat, infrastructure observability, error tracking, product analytics warehouse) in parallel, then returns a cited read on decisions and tradeoffs. Use how for runtime behavior."
++description: "Use for 'why does X work this way', 'why we picked Y', design rationale, regressions, postmortems, or data-backed thresholds. Reads git history, plus any other evidence source that's connected, then returns a cited read on decisions and tradeoffs. Use how for runtime behavior."
+ disable-model-invocation: true
+ ---
+ 
+@@ -8,9 +8,7 @@ disable-model-invocation: true
+ 
+ Investigate the motivation and intent behind code. The companion `how` skill answers what the code does and how it works. `why` answers what forces led to its shape.
+ 
+-Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
+-
+-Every spawn is `generalPurpose` with `readonly: false` (agent mode). **Do not use readonly/Ask mode.** It strips MCP access, which disables the MCP-backed investigators and the synthesizer's citation spot-checks. Investigators still shouldn't write anything.
++Every spawn is a `general` subagent, on the session's model. Investigators and the synthesizer read and cite, and leave files untouched.
+ 
+ ## Operating Posture
+ 
+@@ -24,7 +22,7 @@ If the target is vague ("why do we do it this way?" with no clear referent), mak
+ 
+ ## Step 2. Establish the Code Anchor
+ 
+-Before spawning investigators, build the seed context inline: file paths and line ranges, key symbols (functions, classes, constants), the last few commits touching the target, PR numbers from merge commits (pattern `(#1234)` in the subject line), and any linked ticket IDs. Run `git blame -L <start>,<end> <file>` for last-touch commits, `git log --follow -p -- <file>` for full history with patches through renames, `git log --oneline -20 -- <file>` for recent commits with PR numbers visible, and `git log -1 --format=%B <commit>` to extract PR numbers. Then pull the PR bodies and discussion for any substantive commit: `gh pr view <number> --json title,body,author,createdAt,mergedAt,labels,closingIssuesReferences,comments,reviews`. This anchor goes to every investigator and to the synthesizer.
++Before spawning investigators, build the seed context inline: file paths and line ranges, key symbols (functions, classes, constants), and the last few commits touching the target. Run `git blame -L <start>,<end> <file>` for last-touch commits, `git log --follow -p -- <file>` for full history with patches through renames, `git log --oneline -20 -- <file>` for recent commits, and `git log -1 --format=%B <commit>` for full messages. If the repo uses PRs (merge subjects like `(#1234)`), also pull their bodies and discussion with `gh pr view <number>`. This anchor goes to every investigator and to the synthesizer.
+ 
+ ## Step 3. Spawn Parallel Investigators
+ 
+@@ -32,7 +30,7 @@ Before spawning investigators, build the seed context inline: file paths and lin
+ 
+ ### Discovery
+ 
+-Before spawning investigators, list the available MCPs from the Cursor environment. Use the available-tools map when present. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers.
++Before spawning investigators, list the connected MCP servers. With none connected, git is the whole investigation: one investigator, and Sources Consulted says so in one line.
+ 
+ Map each available MCP to one evidence category:
+ 
+@@ -44,9 +42,9 @@ Map each available MCP to one evidence category:
+ 6. Error / exception tracking
+ 7. Product analytics warehouse
+ 
+-Source control is always available through git and `gh`. For the other six, classify using the MCP name, server instructions, tool names, and resource descriptors. If an MCP could fit more than one category, choose the one matching its primary evidence. Record ambiguous cases in the coverage map.
++Source control is always available through git. For the other six, classify using the MCP name, server instructions, tool names, and resource descriptors. If an MCP could fit more than one category, choose the one matching its primary evidence. Record ambiguous cases in the coverage map.
+ 
+-Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently, each owning exactly one tool or MCP. Don't ask one agent to cover multiple MCPs. `model`: the `why investigators` line, default `grok-4.7-xhigh-fast`.
++Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently, each owning exactly one tool or MCP. Don't ask one agent to cover multiple MCPs.
+ 
+ Each investigator's prompt is `references/investigator-prompt.md` filled in, plus:
+ - the category playbook `references/sources/<source>.md` for the selected MCP, adapted from the examples in `references/source-playbook.md`
+@@ -57,7 +55,7 @@ Each investigator's prompt is `references/investigator-prompt.md` filled in, plu
+ 
+ Each category below is uniquely positioned to surface one shape of "why", shown after "Best at". Use it to know what to expect back, to name a gap when a category returns empty, and, only in the rare provably-irrelevant case, to justify a skip.
+ 
+-1. **Source control** (git history, `gh` for PRs, code comments, tests). Always spawn, the only guaranteed source. Best at *implementation-time rationale captured during review*.
++1. **Source control** (git history, code comments, tests, and PRs where the repo has them). Always spawn, the only guaranteed source. Best at *implementation-time rationale captured during review*.
+ 2. **Issue / ticket tracker** (e.g. Linear, Jira, GitHub Issues, Plane, Shortcut MCP). Best at *the product or business forcing function*. Strongest when the why is external to engineering.
+ 3. **Long-form documents** (e.g. Notion, Confluence, Google Docs, Coda MCP). Best at *long-form design rationale*, written out before it becomes code.
+ 4. **Real-time team chat** (e.g. Slack, Discord, Microsoft Teams, Mattermost MCP). Best at *real-time deliberation that never reached a doc*. Especially important when the source control, ticket, and doc paper trail is thin.
+@@ -72,11 +70,11 @@ Only with an **explicit, written justification** that goes in the final Sources
+ - **No MCP is available for that category** in this environment. Flag it as a gap, not a choice: "Real-time team chat skipped. No matching MCP available, so the conversational record was not searchable."
+ - **The source is provably irrelevant**, not just "probably irrelevant." A high bar: "Error / exception tracking skipped. Target is a build-time script with no runtime code path."
+ 
+-If your scope assessment suggests a single-commit trivial target where the PR description already contains the complete answer, you may answer inline **only after** confirming all seven available category searches would be redundant. Say so explicitly. This should be rare.
++If the target is a single commit whose message already holds the whole answer, answer inline and say so.
+ 
+ ## Step 4. Synthesize
+ 
+-Spawn one synthesizer. `model`: the `why synthesizer` line, default `claude-opus-5-5-xhigh`. It gets:
++Spawn one synthesizer. It gets:
+ 1. The investigator findings, including any null results and any categories skipped with justification
+ 2. The code anchor
+ 3. The user's original question
