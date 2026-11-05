@@ -1,0 +1,10 @@
+{
+  "name": "sochinorth.you-should-know",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./rpc": "./rpc.ts",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
+  }
+}

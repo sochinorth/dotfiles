@@ -15,8 +15,9 @@
     "paths": {
       "solid-js": ["./node_modules/solid-js"],
       "solid-js/*": ["./node_modules/solid-js/*"],
-      "@opencode/plugin/gui": ["./node_modules/@opencode/plugin/dist/gui/index.d.ts"]
+      "@opencode/plugin/gui": ["./node_modules/@opencode/plugin/dist/gui/index.d.ts"],
+      "@opencode/plugin/rpc": ["./node_modules/@opencode/plugin/dist/rpc.d.ts"]
     }
   },
-  "files": ["../plugins/tool-descriptions/gui/gui.tsx", "../plugins/follow-tools/gui/gui.ts"]
+  "files": ["../plugins/tool-descriptions/gui/gui.tsx", "../plugins/follow-tools/gui/gui.ts", "../plugins/you-should-know/gui/gui.tsx"]
 }

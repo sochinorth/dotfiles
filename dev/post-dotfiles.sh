@@ -11,7 +11,7 @@ set -euo pipefail
 mkdir -p ~/.local/pi-shims
 for f in node npm npx; do ln -sfn /usr/bin/bun ~/.local/pi-shims/$f; done
 
-# The plugins' GUI parts (tool-descriptions, follow-tools) are built into each
+# The plugins' GUI parts (tool-descriptions, follow-tools, you-should-know) are built into each
 # plugin's dist/, not tracked, by opencode/build, which keeps the build's
 # node_modules out of the plugins' watched directories. After editing a
 # plugin's gui/, rerun this line.
