@@ -117,7 +117,14 @@ restart_sec = "5"
 "~/.config/opencode/skills/idasql-types" = { source = "dev/skills/idasql/plugins/idasql/skills/types", mode = "symlink" }
 "~/.config/opencode/skills/idasql-ui-context" = { source = "dev/skills/idasql/plugins/idasql/skills/ui-context", mode = "symlink" }
 "~/.config/opencode/skills/idasql-xrefs" = { source = "dev/skills/idasql/plugins/idasql/skills/xrefs", mode = "symlink" }
-# Skills picked from upstream are linked by skup, from tracked clones outside this repo.
+# Our own skills. Those picked from upstream are linked by skup (dev/skills/skup),
+# from tracked clones outside this repo.
+"~/.config/opencode/skills/forensics" = { source = "dev/skills/forensics", mode = "symlink" }
+"~/.config/opencode/skills/full-stop" = { source = "dev/skills/full-stop", mode = "symlink" }
+"~/.config/opencode/skills/interrogate" = { source = "dev/skills/interrogate", mode = "symlink" }
+"~/.config/opencode/skills/pickup" = { source = "dev/skills/pickup", mode = "symlink" }
+"~/.config/opencode/skills/root" = { source = "dev/skills/root", mode = "symlink" }
+"~/.config/opencode/skills/sparring" = { source = "dev/skills/sparring", mode = "symlink" }
 "~/.local/bin/skup" = { source = "dev/skills/skup", mode = "symlink" }
 # who may log in through dropbear (the phone); a copy at 0600, like ~/.ssh/config
 "~/.ssh/authorized_keys" = { source = "dev/ssh/authorized_keys", mode = "copy", permissions = "0600" }
