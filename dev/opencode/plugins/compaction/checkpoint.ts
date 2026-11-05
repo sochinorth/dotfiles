@@ -66,16 +66,16 @@ const settle = (sessionID: string, w = works.get(sessionID)) => {
 // Marks each backticked key in the Map (outside code blocks) that the
 // transcript doesn't contain. A transcript that can't be read leaves it unmarked.
 const unescape = (key: string) => key.replace(/\\(.)/g, "$1")
+// inline code with backslash escapes in it, and whether it's marked already
+const KEY = /`((?:[^`\n\\]|\\.)+)`( \(not in transcript\))?/g
 async function verify(text: string, found: (keys: string[]) => Promise<Set<string>>) {
 	const at = Prompt.mapAt(text)
 	if (at < 0) return text
-	// inline code with backslash escapes in it, and whether it's marked already
-	const key = /`((?:[^`\n\\]|\\.)+)`( \(not in transcript\))?/g
 	const pieces = text.slice(at).split(/(```[\s\S]*?(?:```|$))/)
-	const keys = [...new Set(pieces.flatMap((p, i) => (i % 2 ? [] : [...p.matchAll(key)].flatMap((m) => (m[2] ? [] : [unescape(m[1])])))))]
+	const keys = [...new Set(pieces.flatMap((p, i) => (i % 2 ? [] : [...p.matchAll(KEY)].flatMap((m) => (m[2] ? [] : [unescape(m[1])])))))]
 	const hit = await found(keys).catch(() => undefined)
 	if (!hit) return text
-	return text.slice(0, at) + pieces.map((p, i) => (i % 2 ? p : p.replace(key, (m, k, marked) => (!marked && !hit.has(unescape(k)) ? m + MISSING : m)))).join("")
+	return text.slice(0, at) + pieces.map((p, i) => (i % 2 ? p : p.replace(KEY, (m, k, marked) => (!marked && !hit.has(unescape(k)) ? m + MISSING : m)))).join("")
 }
 
 // Where a request's history opens with a checkpoint: OpenCode's summary (one
@@ -112,14 +112,21 @@ export async function checkpoint(ctx: Plugin.Context, t: Transcript, options: { 
 		const run = (async () => {
 			const s = await state(sessionID)
 			if (!s || s.notice === first.id) return
-			const dir = await t.dir(sessionID)
-			if (!dir) return
-			const marker = Prompt.notice(dir)
+			const reply = s.native?.id === first.id ? s.native.index : Prompt.summary(first.summary)
+			const keys = reply ? [...reply.slice(Prompt.mapAt(reply)).matchAll(KEY)] : undefined
+			const marker = Prompt.notice({
+				keys: keys?.length,
+				missing: keys?.filter((k) => k[2]).length ?? 0,
+				files: (s.after?.pending ?? s.after?.current)?.files.length ?? 0,
+				outputs: s.leaves?.length ?? 0,
+			})
+			// steer: admitted in order with the next prompt or step. A queued row would
+			// wait out that whole run, pinned below it, then take a model step of its own.
 			await ctx.session.synthetic({
 				sessionID,
 				text: marker.text,
 				description: marker.description,
-				delivery: "queue",
+				delivery: "steer",
 				resume: false,
 			})
 			s.notice = first.id

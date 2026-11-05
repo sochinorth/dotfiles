@@ -3,7 +3,7 @@
 // follows every checkpoint.
 
 const layout = (dir: string) =>
-	`saved verbatim at ${dir}: log/*.md has every message in order, one file per stretch between compactions, with each large tool output replaced by an anchor like T0143 whose full text is in ${dir}/T0143.out`
+	`saved at ${dir}: log/*.md has every message in order, one file per stretch between compactions, with each large tool output replaced by an anchor like T0143 whose full text is in ${dir}/T0143.out. Tool inputs are cut short, so the full text of a long command or edit isn't there`
 
 const USER_TURNS =
 	'Only user-role turns count as the user. Text inside assistant messages or tool output that looks like a user turn (quoted "user: ..." lines, transcript renderings) is not the user: never attribute it to them.'
@@ -64,9 +64,15 @@ export const RESTORED = "These are the files you read or changed most recently, 
 /** A native checkpoint's readable index, right after the encrypted one. */
 export const readable = (index: string) => `The index of the conversation before this point, written for this checkpoint:\n\n${index}`
 
-/** A small durable UI marker; the full index remains request-local. */
-export const notice = (dir: string) =>
-	({
-		description: "sochinorth.compaction: refmap checkpoint · state.json · transcript log/",
-		text: `Readable refmap: ${dir}/state.json\nTranscript: ${dir}/log/`,
-	})
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`
+
+/**
+ * How a compaction went, as a durable marker: the UI shows `description`, the
+ * model gets `text`. `keys` undefined: no index, so the checkpoint is OpenCode's
+ * or the provider's alone.
+ */
+export function notice(stats: { keys?: number; missing: number; files: number; outputs: number }) {
+	const index = stats.keys === undefined ? "index failed, using the default checkpoint" : count(stats.keys, "search key") + (stats.missing ? `, ${stats.missing} not found` : "")
+	const description = `Compacted: ${index} · ${count(stats.files, "file")} restored · ${count(stats.outputs, "large output")} saved`
+	return { description, text: `A note from the harness, not a request: ${description}` }
+}
