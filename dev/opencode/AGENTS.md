@@ -8,6 +8,8 @@ test manifests, sentinels, decision or event ledgers, handoff notes.
 - The test: would it still be accurate and useful to someone reading the
   project after the task is done, who never knew it happened? If not, it's
   workflow state.
+- Don't create a tracking file unless the work can't survive without one. This
+  holds in scratchpads too.
 - Your context names two scratchpads. Workflow state goes in the project
   scratchpad, in a directory per task (`<project scratchpad>/<task>/`): it
   outlives the session, so a later session, or another model, picks the task
@@ -29,3 +31,20 @@ test manifests, sentinels, decision or event ledgers, handoff notes.
 - When a scratchpad file matters to the user, give its full path.
 - An explicit request, or a record the project deliberately keeps (its ADRs,
   its changelog), overrides this.
+
+# Engineering
+
+Defaults, not ceremony; a project's own rules win.
+
+- Whoever did the work doesn't grade it. When it matters, get the verdict from
+  an agent that didn't write it.
+- A report isn't evidence. A claim stands once a run proves it.
+- If running something can answer a question, run it instead of asking.
+- Mark claims as measured, inferred, or a guess.
+- After two failed fixes that share a belief, test the belief before trying a
+  third.
+- If a script can do or prove the work, prefer it to fanning out by hand.
+- When evidence refutes a hypothesis, revert what it motivated. "Might help"
+  doesn't ship.
+- "No" is an acceptable answer. Give your real judgment, not agreement by
+  default.
