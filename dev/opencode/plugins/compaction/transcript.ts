@@ -7,10 +7,13 @@
 //                          outputs of the current stretch, and the checkpoint's
 // The log is appended from ctx.session.context() before each step and before a
 // compaction; a large output is written to its T file then, and its entry points
-// at it. The model's copy of an output is never changed. Message IDs ascend,
-// which is what the cursor compares. All of it is deleted with the session's
-// scratchpad and moves with it; a fork gets a new session ID, so it starts a
-// transcript, and a state, of its own.
+// at it. The model's copy of an output is never changed. The cursor resumes at
+// its message's place in the list, and a revert resumes at the last message of
+// the segment's logged IDs still there. IDs don't order messages (a fork's copies
+// end in an unpadded _<seq>, a queued message keeps the older ID it was queued
+// with) and neither does the wall clock, which can step back. All of it is
+// deleted with the session's scratchpad and moves with it; a fork gets a new
+// session ID, so it starts a transcript, and a state, of its own.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve, sep } from "node:path"
 import type { Plugin } from "@opencode/plugin"
@@ -22,7 +25,7 @@ const PRIVATE = { mode: 0o600 }
 const SESSION_ID = /^ses_[A-Za-z0-9]+$/
 const NATIVE = "native: an encrypted checkpoint OpenAI keeps; this segment's index follows"
 
-type Cursor = { segment: number; compaction?: string; message?: string; parts?: number }
+type Cursor = { segment: number; compaction?: string; message?: string; parts?: number; logged?: string[] }
 /** A large output written whole, one of the current stretch's. */
 export type Leaf = { anchor: string; tool: string; input: string; bytes: number }
 
@@ -91,9 +94,15 @@ function entries(m: any, from: number, newest: boolean, output: (text: string, t
 			const files = (m.files ?? []).map((f: any) => `[attached: ${f.name ?? f.source?.uri ?? f.mime} (${f.mime})]`)
 			return one([`## user · ${time}`, m.text, ...files].join("\n"))
 		}
-		case "synthetic":
+		// what the model read, a subagent's report among them; the description only labels it
+		case "synthetic": {
+			if (from > 0) return { text: [], parts: 1 }
+			const label = m.description && m.description !== m.text ? clip(m.description, 1024) : ""
+			const body = m.text ? output(m.text, m.type, { title: m.description }) : ""
+			return one([`## synthetic · ${time}`, label, body].filter(Boolean).join("\n"))
+		}
 		case "system":
-			return one(`## ${m.type} · ${time}\n${clip(m.description || m.text || "", 1024)}`)
+			return one(`## system · ${time}\n${clip(m.description || m.text || "", 1024)}`)
 		case "skill":
 			return one(`## skill ${m.name} · ${time}`)
 		case "shell": {
@@ -206,7 +215,7 @@ export function transcript(ctx: Plugin.Context): Transcript {
 		if (first?.type === "compaction" && first.status === "completed" && first.id !== cursor.compaction) {
 			// the history since the last sync went with it; the compaction hook syncs first
 			append(path, cursor.segment, [`## checkpoint ${cursor.segment} · ${at(first.time?.created)}\n${first.summary || NATIVE}`])
-			Object.assign(cursor, { segment: cursor.segment + 1, compaction: first.id, message: undefined, parts: undefined })
+			Object.assign(cursor, { segment: cursor.segment + 1, compaction: first.id, message: undefined, parts: undefined, logged: [] })
 			state.leaves = []
 		}
 		// Inline, or written whole and pointed at. A read of the transcript's own
@@ -220,8 +229,12 @@ export function transcript(ctx: Plugin.Context): Transcript {
 			return `→ ${anchor} (${size(bytes)}): ${file}\n${clip(text.split("\n", 1)[0], 200)}`
 		}
 		const text: string[] = []
-		if (cursor.message && !messages.some((m) => m.id === cursor.message)) {
-			const kept = messages.findLast((m) => m.id < cursor.message! && m.type !== "idle" && m.type !== "compaction")
+		const place = () => messages.findIndex((m) => m.id === cursor.message)
+		// a cursor saved without the list: everything up to it counts as logged
+		cursor.logged ??= messages.slice(0, place() + 1).map((m) => m.id)
+		if (cursor.message && place() < 0) {
+			const logged = new Set(cursor.logged)
+			const kept = messages.findLast((m) => logged.has(m.id) && m.type !== "idle" && m.type !== "compaction")
 			text.push(
 				`## reverted · ${at(Date.now())}\n` +
 					(kept ? `The messages above logged after ${at(kept.time?.created)} were undone.` : "The messages above, back to the start of this segment, were undone."),
@@ -230,12 +243,13 @@ export function transcript(ctx: Plugin.Context): Transcript {
 			cursor.parts = kept?.type === "assistant" ? kept.content.length : 1
 		}
 		const newest = messages.findLastIndex((m) => m.type !== "idle" && m.type !== "compaction")
-		for (let i = 0; i < messages.length; i++) {
+		for (let i = Math.max(place(), 0); i < messages.length; i++) {
 			const m = messages[i]
-			if (m.type === "compaction" || (cursor.message && m.id < cursor.message)) continue
+			if (m.type === "compaction") continue
 			const from = m.id === cursor.message ? (cursor.parts ?? 0) : 0
 			const logged = entries(m, from, i === newest, output)
 			text.push(...logged.text)
+			if (m.id !== cursor.message) cursor.logged.push(m.id)
 			cursor.message = m.id
 			cursor.parts = Math.max(from, logged.parts)
 			if (m.type === "assistant" && logged.parts < (m.content ?? []).length) break
