@@ -28,10 +28,8 @@ function paths(part: any): { path: string; write: boolean }[] {
 	switch (part.name) {
 		case "read":
 		case "edit":
-		case "write": {
-			const path = input.path ?? input.filePath
-			return typeof path === "string" ? [{ path, write: part.name !== "read" }] : []
-		}
+		case "write":
+			return typeof input.path === "string" ? [{ path: input.path, write: part.name !== "read" }] : []
 		case "patch":
 			return typeof input.patchText === "string"
 				? [...input.patchText.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)].map((m) => ({ path: m[1].trim(), write: true }))

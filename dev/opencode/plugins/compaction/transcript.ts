@@ -15,11 +15,10 @@
 // deleted with the session's scratchpad and moves with it; a fork gets a new
 // session ID, so it starts a transcript, and a state, of its own.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs"
-import { dirname, join, resolve, sep } from "node:path"
+import { join, resolve, sep } from "node:path"
 import type { Plugin } from "@opencode/plugin"
 
 const LEAF_BYTES = 4096
-const INLINE_BYTES = 4096
 const INPUT_CHARS = 300
 const PRIVATE = { mode: 0o600 }
 const SESSION_ID = /^ses_[A-Za-z0-9]+$/
@@ -29,27 +28,15 @@ type Cursor = { segment: number; compaction?: string; message?: string; parts?: 
 /** A large output written whole, one of the current stretch's. */
 export type Leaf = { anchor: string; tool: string; input: string; bytes: number }
 
-export interface Transcript {
-	/** The session's transcript directory, created; undefined until its scratchpad is known. */
-	dir(sessionID: string): Promise<string | undefined>
-	/** Brings the current log segment up to date with ctx.session.context(). Idempotent. */
-	sync(sessionID: string): Promise<void>
-	/** Which of `needles` occur in the log or the large outputs; one pass over the files. Throws without a transcript. */
-	found(sessionID: string, needles: string[]): Promise<Set<string>>
-	/** The session's state, one object the modules share (each under its own key), or undefined without a transcript. */
-	state(sessionID: string): Promise<State | undefined>
-	/** Writes the session's state after a change. */
-	save(sessionID: string): Promise<void>
-}
+export type Transcript = ReturnType<typeof transcript>
 // one record per session; its modules each keep their own field
 export type State = { cursor?: Cursor; leaves?: Leaf[]; [field: string]: any }
 
-// Plugin instances per location share one process: one counter and one sync
-// queue per session across them.
-const shared: { counters: Map<string, number>; queues: Map<string, Promise<void>>; states: Map<string, State> } = ((globalThis as any)[
+// Plugin instances per location share one process: one sync queue and one state
+// per session across them.
+const shared: { queues: Map<string, Promise<void>>; states: Map<string, State> } = ((globalThis as any)[
 	Symbol.for("sochinorth.compaction.transcript")
 ] ??= {})
-shared.counters ??= new Map()
 shared.queues ??= new Map()
 shared.states ??= new Map() // by state file path, so a moved scratchpad's is read anew
 
@@ -73,7 +60,7 @@ const clip = (text: string, max: number) => {
 /** A tool input in a line: its main argument first, then the rest as key=value. */
 export function brief(input: unknown): string {
 	const o = input && typeof input === "object" ? (input as Record<string, unknown>) : {}
-	const main = ["command", "path", "filePath", "pattern", "query", "url"].find((k) => typeof o[k] === "string")
+	const main = ["command", "path", "pattern", "query", "url"].find((k) => typeof o[k] === "string")
 	const rest = Object.entries(o).filter(([k, v]) => k !== main && k !== "description" && v !== undefined)
 	const s = [main ? String(o[main]) : "", ...rest.map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)]
 		.join(" ")
@@ -87,8 +74,10 @@ export function brief(input: unknown): string {
 // running in the newest message. `output` is how an output is logged: inline,
 // or as a pointer to the T file it's written to.
 function entries(m: any, from: number, newest: boolean, output: (text: string, tool: string, input?: unknown) => string): { text: string[]; parts: number } {
+	// only an assistant message grows after it's logged
+	if (from > 0 && m.type !== "assistant") return { text: [], parts: 1 }
 	const time = at(m.time?.created)
-	const one = (text: string) => ({ text: from > 0 ? [] : [text], parts: 1 })
+	const one = (text: string) => ({ text: [text], parts: 1 })
 	switch (m.type) {
 		case "user": {
 			const files = (m.files ?? []).map((f: any) => `[attached: ${f.name ?? f.source?.uri ?? f.mime} (${f.mime})]`)
@@ -96,7 +85,6 @@ function entries(m: any, from: number, newest: boolean, output: (text: string, t
 		}
 		// what the model read, a subagent's report among them; the description only labels it
 		case "synthetic": {
-			if (from > 0) return { text: [], parts: 1 }
 			const label = m.description && m.description !== m.text ? clip(m.description, 1024) : ""
 			const body = m.text ? output(m.text, m.type, { title: m.description }) : ""
 			return one([`## synthetic · ${time}`, label, body].filter(Boolean).join("\n"))
@@ -106,7 +94,6 @@ function entries(m: any, from: number, newest: boolean, output: (text: string, t
 		case "skill":
 			return one(`## skill ${m.name} · ${time}`)
 		case "shell": {
-			if (from > 0) return { text: [], parts: 1 }
 			const status = m.status === "exited" ? `exit ${m.exit ?? "?"}` : m.status
 			return one(`## shell · ${status} · ${time}\n$ ${m.command}\n${output(m.output?.output ?? "", "shell", { command: m.command })}`)
 		}
@@ -137,9 +124,7 @@ function entries(m: any, from: number, newest: boolean, output: (text: string, t
 	return { text, parts: content.length }
 }
 
-export function transcript(ctx: Plugin.Context): Transcript {
-	const limit = typeof ctx.options.spill === "number" && ctx.options.spill > 0 ? ctx.options.spill : LEAF_BYTES
-
+export function transcript(ctx: Plugin.Context) {
 	const dir = async (sessionID: string) => {
 		const pad = (globalThis as any)[Symbol.for("sochinorth.scratchpad")] as
 			| { dirs: Map<string, string>; queue?: Promise<void>; prepare?: (ctx: Plugin.Context, sessionID: string) => Promise<void> }
@@ -155,11 +140,9 @@ export function transcript(ctx: Plugin.Context): Transcript {
 		return path
 	}
 
-	// the next T number: one past the highest on disk on first use, then counted here
-	const write = (path: string, sessionID: string, text: string) => {
-		let n =
-			shared.counters.get(sessionID) ??
-			Math.max(0, ...readdirSync(path).map((f) => Number(/^T(\d+)\.out$/.exec(f)?.[1] ?? 0)))
+	// the next T number: one past the highest on disk
+	const write = (path: string, text: string) => {
+		let n = Math.max(0, ...readdirSync(path).map((f) => Number(/^T(\d+)\.out$/.exec(f)?.[1] ?? 0)))
 		for (;;) {
 			const anchor = `T${String(++n).padStart(4, "0")}`
 			const file = join(path, `${anchor}.out`)
@@ -169,7 +152,6 @@ export function transcript(ctx: Plugin.Context): Transcript {
 				if (e?.code === "EEXIST") continue
 				throw e
 			}
-			shared.counters.set(sessionID, n)
 			return { anchor, file }
 		}
 	}
@@ -222,9 +204,9 @@ export function transcript(ctx: Plugin.Context): Transcript {
 		// files isn't written again under a new number.
 		const output = (text: string, tool: string, input?: unknown) => {
 			const bytes = Buffer.byteLength(text)
-			const read = tool === "read" ? ((input as any)?.path ?? (input as any)?.filePath) : undefined
-			if (bytes <= limit || (typeof read === "string" && resolve(read).startsWith(resolve(dirname(path)) + sep))) return clip(text, INLINE_BYTES)
-			const { anchor, file } = write(path, sessionID, unnul(text))
+			const read = tool === "read" ? (input as any)?.path : undefined
+			if (bytes <= LEAF_BYTES || (typeof read === "string" && resolve(read).startsWith(resolve(path) + sep))) return clip(text, LEAF_BYTES)
+			const { anchor, file } = write(path, unnul(text))
 			;(state.leaves ??= []).push({ anchor, tool, input: brief(input), bytes })
 			return `→ ${anchor} (${size(bytes)}): ${file}\n${clip(text.split("\n", 1)[0], 200)}`
 		}
@@ -259,23 +241,28 @@ export function transcript(ctx: Plugin.Context): Transcript {
 	}
 
 	return {
+		/** The session's transcript directory, created; undefined until its scratchpad is known. */
 		dir,
-		sync(sessionID) {
+		/** Brings the current log segment up to date with ctx.session.context(). Idempotent. */
+		sync(sessionID: string) {
 			const next = Promise.resolve(shared.queues.get(sessionID))
 				.then(() => update(sessionID))
 				.catch((e) => console.error("compaction: transcript", sessionID, e))
 			shared.queues.set(sessionID, next)
 			return next
 		},
-		async state(sessionID) {
+		/** The session's state, one object the modules share (each under its own key), or undefined without a transcript. */
+		async state(sessionID: string) {
 			const path = await dir(sessionID)
 			return path ? load(path) : undefined
 		},
-		async save(sessionID) {
+		/** Writes the session's state after a change. */
+		async save(sessionID: string) {
 			const path = await dir(sessionID)
 			if (path) store(path)
 		},
-		async found(sessionID, needles) {
+		/** Which of `needles` occur in the log or the large outputs; one pass over the files. Throws without a transcript. */
+		async found(sessionID: string, needles: string[]) {
 			const path = await dir(sessionID)
 			if (!path) throw new Error("no transcript")
 			const files = [...readdirSync(join(path, "log")).map((f) => join(path, "log", f)), ...readdirSync(path).filter((f) => f.endsWith(".out")).map((f) => join(path, f))]

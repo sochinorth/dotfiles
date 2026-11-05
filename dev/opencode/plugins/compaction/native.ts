@@ -34,26 +34,25 @@ const unsupported = (error: any) =>
 // "provider/model" whose native compaction was refused, for every location's instance
 const shared: { off?: Set<string> } = ((globalThis as any)[Symbol.for("sochinorth.compaction.native")] ??= {})
 
-/** Makes models native (unless `enabled` is false) and returns the handlers of the session events native compaction follows. */
-export async function native(ctx: Plugin.Context, t: Transcript, work: (sessionID: string) => Work, log: (...args: unknown[]) => void, enabled = true) {
+/** Makes models native and returns the handlers of the session events native compaction follows. */
+export async function native(ctx: Plugin.Context, t: Transcript, work: (sessionID: string) => Work, log: (...args: unknown[]) => void) {
 	const off = (shared.off ??= new Set(((await ctx.storage.get("native-off")) as string[] | undefined) ?? []))
 	// what this location's transform made native
 	const made = new Set<string>()
-	if (enabled)
-		await ctx.model.transform((editor) => {
-			made.clear()
-			for (const model of editor.list()) {
-				const source = editor.provider.get(model.providerID)?.provider
-				const key = ref(model)
-				if (!PACKAGES.has(model.package ?? source?.package ?? "") || off.has(key)) continue
-				if (!FAMILY.test(model.family ?? model.id)) continue
-				if (model.settings?.compaction ?? source?.settings?.compaction) continue
-				editor.update(model.providerID, model.id, (m) => {
-					m.settings = { ...m.settings, compaction: { type: "native" } }
-				})
-				made.add(key)
-			}
-		})
+	await ctx.model.transform((editor) => {
+		made.clear()
+		for (const model of editor.list()) {
+			const source = editor.provider.get(model.providerID)?.provider
+			const key = ref(model)
+			if (!PACKAGES.has(model.package ?? source?.package ?? "") || off.has(key)) continue
+			if (!FAMILY.test(model.family ?? model.id)) continue
+			if (model.settings?.compaction ?? source?.settings?.compaction) continue
+			editor.update(model.providerID, model.id, (m) => {
+				m.settings = { ...m.settings, compaction: { type: "native" } }
+			})
+			made.add(key)
+		}
+	})
 	const state = (sessionID: string) => t.state(sessionID) as Promise<Mine | undefined>
 
 	return {

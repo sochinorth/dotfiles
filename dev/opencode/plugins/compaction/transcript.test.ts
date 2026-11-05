@@ -165,6 +165,41 @@ describe("the log's cursor", () => {
 	})
 })
 
+describe("large reads", () => {
+	const read = (id: string, path: string, text: string) => ({
+		id,
+		type: "assistant",
+		content: [{ type: "tool", name: "read", state: { status: "completed", input: { path }, content: [{ type: "text", text }] } }],
+		time: { created: ++clock },
+	})
+	const large = `the start.\n${"x".repeat(5000)}\nthe end.`
+
+	test("a read of this session's own transcript isn't written again", async () => {
+		const s = session()
+		s.history.messages.push(read("msg_a", join(s.dir, "log", "0001.md"), large))
+		await s.sync()
+		expect(s.outputs()).toHaveLength(0)
+	})
+
+	test("a read of another session's transcript is written whole", async () => {
+		const s = session()
+		s.history.messages.push(read("msg_a", join(s.dir, "..", "ses_other", "T0001.out"), large))
+		await s.sync()
+		expect(s.outputs()).toHaveLength(1)
+		expect(await s.t.found(SESSION, ["the end."])).toEqual(new Set(["the end."]))
+	})
+
+	test("numbers a new output past those already on disk", async () => {
+		const s = session()
+		mkdirSync(s.dir, { recursive: true })
+		writeFileSync(join(s.dir, "T0007.out"), "earlier")
+		s.history.messages.push(read("msg_a", "/elsewhere/file", large))
+		await s.sync()
+		expect(s.outputs().toSorted()).toEqual(["T0007.out", "T0008.out"])
+		expect(readFileSync(join(s.dir, "T0007.out"), "utf8")).toBe("earlier")
+	})
+})
+
 describe("synthetic messages", () => {
 	const synthetic = (id: string, description: string, text: string) => ({ id, type: "synthetic", description, text, time: { created: ++clock } })
 

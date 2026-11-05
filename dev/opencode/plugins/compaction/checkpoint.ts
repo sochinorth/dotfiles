@@ -63,19 +63,17 @@ const settle = (sessionID: string, w = works.get(sessionID)) => {
 	if (w && works.get(sessionID) === w && Object.values(w).every((v) => v === undefined)) works.delete(sessionID)
 }
 
-// Marks each backticked key in the Map (outside code blocks) that the
-// transcript doesn't contain. A transcript that can't be read leaves it unmarked.
+// Marks each backticked key in the Map that the transcript doesn't contain. A
+// transcript that can't be read leaves it unmarked.
 const unescape = (key: string) => key.replace(/\\(.)/g, "$1")
 // inline code with backslash escapes in it, and whether it's marked already
 const KEY = /`((?:[^`\n\\]|\\.)+)`( \(not in transcript\))?/g
 async function verify(text: string, found: (keys: string[]) => Promise<Set<string>>) {
 	const at = Prompt.mapAt(text)
-	if (at < 0) return text
-	const pieces = text.slice(at).split(/(```[\s\S]*?(?:```|$))/)
-	const keys = [...new Set(pieces.flatMap((p, i) => (i % 2 ? [] : [...p.matchAll(KEY)].flatMap((m) => (m[2] ? [] : [unescape(m[1])])))))]
-	const hit = await found(keys).catch(() => undefined)
+	const map = text.slice(at)
+	const hit = await found([...map.matchAll(KEY)].flatMap((m) => (m[2] ? [] : [unescape(m[1])]))).catch(() => undefined)
 	if (!hit) return text
-	return text.slice(0, at) + pieces.map((p, i) => (i % 2 ? p : p.replace(KEY, (m, k, marked) => (!marked && !hit.has(unescape(k)) ? m + MISSING : m)))).join("")
+	return text.slice(0, at) + map.replace(KEY, (m, k, marked) => (!marked && !hit.has(unescape(k)) ? m + MISSING : m))
 }
 
 // Where a request's history opens with a checkpoint: OpenCode's summary (one
@@ -96,9 +94,9 @@ function opening(messages: readonly any[]): { index: number; anchor: string } | 
 }
 
 /** Registers the compaction's hooks, /compact and its event subscription; returns their teardown. */
-export async function checkpoint(ctx: Plugin.Context, t: Transcript, options: { native?: boolean } = {}) {
+export async function checkpoint(ctx: Plugin.Context, t: Transcript) {
 	const log = (...args: unknown[]) => console.error(LOG, ...args)
-	const nativeEvents = await native(ctx, t, work, log, options.native !== false)
+	const nativeEvents = await native(ctx, t, work, log)
 	const state = (sessionID: string) => t.state(sessionID) as Promise<Mine | undefined>
 
 	// Keep a small durable marker visible in the UI without storing the full
