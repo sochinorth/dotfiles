@@ -18,7 +18,7 @@ Work on a branch or in a worktree, leaving trunk and any remote alone.
 
 Make the smallest change that meets the condition. Fix the case that happened. Verify each piece before building on it, and revert whatever a failed check refutes.
 
-Fan out where the work splits cleanly; the `root` skill covers how. Background subagents keep you going: their completion notices wake you, so while any are running you can end your turn. Ending your turn with none running ends the run.
+Fan out where the work splits cleanly; the `root-agent` skill covers how. Background subagents keep you going: their completion notices wake you, so while any are running you can end your turn. Ending your turn with none running ends the run.
 
 Discoveries that serve the goal are yours to handle: flaky checks, broken tooling, related bugs in the way. A plateau means try another approach. A real dead end means stop and say so, rather than spin.
 
