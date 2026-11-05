@@ -86,8 +86,8 @@ A skill's ID is its link's name, which is how `diagnosing-bugs` becomes `diagnos
 here; the patch renames references to it. Plain IDs rather than prefixes, since
 skills in these repos name and link each other by plain name. Skills are called
 with `@id`, and most are hidden from the model until then. The advertised ones are
-those it should reach for by itself: `grilling`, `diagnose`, `agent-docs`, `unslop`
-and eight `principle-*`. Other `principle-*` skills are here only because a pick
+those it should reach for by itself: `grilling`, `diagnose`, `sparring` (say "sol
+loop" or "spar with ..."), `agent-docs`, `unslop` and eight `principle-*`. Other `principle-*` skills are here only because a pick
 links to them; pstack has more, one line in `upstream.list` away.
 
 ## Order of operations, and why

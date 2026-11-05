@@ -1,7 +1,6 @@
 ---
 name: sparring
-description: "Work something through with one trusted partner from another model family: you own the work, they give a second opinion."
-disable-model-invocation: true
+description: "Work something through with one trusted partner from another model family: you own the work, they give a second opinion. Use when the user says \"sol loop\", \"spar with ...\", or \"run sparring\"."
 ---
 
 # Sparring
@@ -10,11 +9,11 @@ Go back and forth with one partner on whatever the user names: a change, a plan,
 
 ## Pick the partner
 
-Use the partner the user names. Otherwise use the strongest model from the family you aren't running on: `openai/gpt-6.1-sol#high` if you're Claude, `claude-agent/opus` if you're OpenAI. Set it with the subagent tool's `model` parameter; invoking this skill is the request to do so. If the model is rejected, look up its current ID. If the other family can't run, tell the user: a same-family partner has your blind spots.
+Use the partner the user names; "sol loop" names Sol. Otherwise use the strongest model from the family you aren't running on: `openai/gpt-6.1-sol#high` if you're Claude, `claude-agent/opus` if you're OpenAI. Set it with the subagent tool's `model` parameter; invoking this skill is the request to do so. If the model is rejected, look up its current ID. If the other family can't run, tell the user: a same-family partner has your blind spots.
 
 ## Set the mode
 
-Read it from the request:
+Read it from the request. A bare "sol loop" on a change means review.
 
 - **Review:** the partner judges something finished, and returns a verdict with findings ranked `blocker` (the intended case is wrong), `should` (a real bug callers will hit), `nit` (the rest).
 - **Collaborate:** an open discussion. They challenge your reasoning, propose rivals, and build on what holds up.
