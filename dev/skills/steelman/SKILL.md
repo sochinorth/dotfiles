@@ -1,6 +1,6 @@
 ---
 name: steelman
-description: "Attack the user's theory, plan, or design as an adversarial collaborator, steelmanning its rivals, until what's left can only be settled by running something. Use for 'steelman', 'poke holes in this', 'play devil's advocate', or when the user wants a theory tested rather than a plan specified."
+description: "Attack the user's theory, plan, or design, steelmanning its rivals, until what's left can only be settled by running something. Use for 'steelman', 'poke holes', 'devil's advocate', or stress-testing whether an idea holds."
 ---
 
 # Steelman
