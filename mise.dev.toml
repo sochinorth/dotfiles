@@ -126,6 +126,9 @@ restart_sec = "5"
 "~/.config/opencode/skills/pickup" = { source = "dev/skills/pickup", mode = "symlink" }
 "~/.config/opencode/skills/root-agent" = { source = "dev/skills/root-agent", mode = "symlink" }
 "~/.config/opencode/skills/sparring" = { source = "dev/skills/sparring", mode = "symlink" }
+"~/.config/opencode/skills/steelman" = { source = "dev/skills/steelman", mode = "symlink" }
+"~/.config/opencode/skills/research" = { source = "dev/skills/research", mode = "symlink" }
+"~/.config/opencode/skills/figure-it-out" = { source = "dev/skills/figure-it-out", mode = "symlink" }
 "~/.local/bin/skup" = { source = "dev/skills/skup", mode = "symlink" }
 # who may log in through dropbear (the phone); a copy at 0600, like ~/.ssh/config
 "~/.ssh/authorized_keys" = { source = "dev/ssh/authorized_keys", mode = "copy", permissions = "0600" }

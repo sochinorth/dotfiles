@@ -14,7 +14,7 @@ Arch (CachyOS repos), reproducible with `mise bootstrap` (mise ≥ 2026.9).
 | `dev/opencode` | OpenCode (v2): the global `opencode.json`, `cli.json` (the TUI's: theme), `AGENTS.md` (global instructions: workflow state goes in the project scratchpad, never in the project), `plugins/codex-sale` (live models with catalog capabilities and limits), `plugins/compaction` (compaction into a tree: an index in context, the session's whole transcript in its scratchpad, large tool outputs filed whole; native for OpenAI models; `/compact <focus>`), `plugins/claude-entrypoint` (Claude launch environment), `plugins/claude-transcripts` (deletes Claude transcripts of deleted sessions), `plugins/follow-tools` (unfolds the grouped tool block the agent is working in, folds it when it moves on), `plugins/native-search` (web search through OpenAI's and Claude's own search tools), `plugins/scratchpad` (a scratchpad per project, and one per session inside it, deleted with the session), `plugins/tool-descriptions` (a short description on every shell and file-change call, shown in the timeline), `web-gui.ts` (desktop GUI plugins in OpenCode Web, through a local proxy; the `opencode.web-gui` unit runs it), and `build` (builds plugins' GUI parts) | mise links `opencode.json`, `AGENTS.md` and the plugins into `~/.config/opencode`, seeds `cli.json`; `post-dotfiles` runs `build` |
 | `dev/skills/idasql` | [idasql-skills](https://github.com/allthingsida/idasql-skills), pinned as a submodule (skills and their references, unchanged upstream) | mise links each skill into `~/.config/opencode/skills/idasql-*`, giving it an IDASQL-prefixed ID |
 | `dev/skills/upstream.list`, `upstream.patch`, `skup` | Skills picked from [mattpocock/skills](https://github.com/mattpocock/skills) and [pstack](https://github.com/cursor/plugins/tree/main/pstack): which ones, our edits to them, and the script that clones, patches and links them | `skup` clones into `~/.local/share/agent-skills` and links into `~/.config/opencode/skills` |
-| `dev/skills/{root-agent,sparring,interrogate,full-stop,pickup,forensics}` | Our own skills, some adapted from pstack and [tstack](https://github.com/t3dotgg/tstack) | mise links each into `~/.config/opencode/skills` |
+| `dev/skills/{root-agent,sparring,steelman,research,figure-it-out,interrogate,full-stop,pickup,forensics}` | Our own skills, some adapted from pstack and [tstack](https://github.com/t3dotgg/tstack) | mise links each into `~/.config/opencode/skills` |
 | `dotfiles/fortune` | fortune cookies fortune-mod doesn't ship: its offensive (`-off`) set, which Arch builds without, and others (sources below) | mise links each into `~/.local/share/fortune`; `post-dotfiles` runs `strfile` |
 | `README.local.md` | Per machine, gitignored: notes about this machine (what isn't captured, where) | |
 
@@ -86,8 +86,8 @@ A skill's ID is its link's name, which is how `diagnosing-bugs` becomes `diagnos
 here; the patch renames references to it. Plain IDs rather than prefixes, since
 skills in these repos name and link each other by plain name. Skills are called
 with `@id`, and most are hidden from the model until then. The advertised ones are
-those it should reach for by itself: `grilling`, `diagnose`, `sparring` (say "sol
-loop" or "spar with ..."), `agent-docs`, `unslop` and eight `principle-*`. Other `principle-*` skills are here only because a pick
+those it should reach for by itself: `grilling`, `steelman`, `research`, `diagnose`, `sparring` (say "sol
+loop" or "spar with ..."), `agent-docs`, `unslop` and eight `principle-*`. Other `principle-*` skills are here only because another skill
 links to them; pstack has more, one line in `upstream.list` away.
 
 ## Order of operations, and why
